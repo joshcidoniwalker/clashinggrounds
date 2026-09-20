@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crud
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6380:6379"
+
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
+    command: -n --log-file=stdout --lt-cred-mech --realm=clashinggrounds.local --user=coturn:changeme
+
+  crud-server:
+    build: ./crud-server
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/crud
+      JWT_SECRET: dev-secret-change-me
+    ports:
+      - "5001:5001"
+    depends_on:
+      - postgres
+    volumes:
+      - ./crud-server:/app
+
+  game-server:
+    build: ./game-server
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-secret-change-me
+    ports:
+      - "5002:5002"
+    depends_on:
+      - redis
+    volumes:
+      - ./game-server:/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - crud-server
+      - game-server
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
