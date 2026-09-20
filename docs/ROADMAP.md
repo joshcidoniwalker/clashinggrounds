@@ -4,7 +4,7 @@ Living document. Phases are ordered by dependency — each one builds on what's 
 
 Status legend: ⬜ not started · 🟨 in progress · ✅ done
 
-## Phase 0 — Scaffolding & tooling ⬜
+## Phase 0 — Scaffolding & tooling ✅
 Set up the monorepo structure and base tooling. No feature logic yet.
 
 **Deliverable:** `docker-compose up` brings up empty-but-running frontend, crud-server, game-server, Postgres, Redis, and coturn containers.
