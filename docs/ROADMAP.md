@@ -27,7 +27,7 @@ Accounts, auth, JWT issuance/verification. Everything else depends on a user exi
 - Login returns a signed JWT; game server verifies its signature locally (no callback) via a test-protected endpoint
 - Frontend has functional signup/login forms and persists the session (e.g. redirect to a placeholder authenticated page on success)
 
-## Phase 2 — Room lifecycle (text/voice not included yet) ⬜
+## Phase 2 — Room lifecycle (text/voice not included yet) ✅
 Room creation, browsing, joining, capacity, host handoff — all via the game server's `room` context and Redis. No chat or voice content yet, just membership and lifecycle.
 
 **Deliverable:** multiple logged-in users can create, browse, join, and leave rooms; host handoff and teardown work correctly.

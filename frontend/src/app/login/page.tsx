@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const { access_token } = await login(email, password);
       setToken(access_token);
-      router.push('/home');
+      router.push('/rooms');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {

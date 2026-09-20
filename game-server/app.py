@@ -1,16 +1,18 @@
 from flask import Flask
+from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from config import Config
 from room.routes import room_bp
 from room.sockets import register_socket_handlers
 
-socketio = SocketIO(cors_allowed_origins="*", async_mode="gevent")
+socketio = SocketIO(cors_allowed_origins=Config.FRONTEND_ORIGIN, async_mode="gevent")
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
+    CORS(app, origins=[Config.FRONTEND_ORIGIN])
 
     app.register_blueprint(room_bp)
 

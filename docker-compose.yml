@@ -53,6 +53,9 @@ services:
       - game-server
     volumes:
       - ./frontend:/app
+      # Anonymous volumes persist across `up` even after a rebuild, so a new
+      # npm dependency won't show up here until you run:
+      #   docker compose up -d --force-recreate --renew-anon-volumes frontend
       - /app/node_modules
       - /app/.next
 
