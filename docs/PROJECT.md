@@ -60,7 +60,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - Basic per-user limits enforced in the game server via Redis counters: a cap on rooms created per user per minute, and a cap on chat messages sent per user per minute. Exact thresholds TBD once there's real usage data to tune against.
 
 **Character creation & rendering**
-- Each user has exactly one persisted character, owned by the CRUD server/Postgres, editable anytime.
+- Each user has exactly one persisted character, owned by the CRUD server/Postgres. Creating a character is a required step of signup — an account isn't complete until a character is designed (no skip, no default-assigned character). Editable anytime afterward from settings.
 - Customization is preset-based for MVP: the user picks one option per slot from a fixed set of choices per slot — no freeform color/shape editing. Slots: hair, eyes, head shape, clothes, skin tone, shoes, accessories. Exact preset count per slot is determined by what the chosen asset pack provides.
 - Rendered as 2D layered sprites: each slot is an image layer, composited together (CSS/Canvas) into the final character.
 - Art source: **Kenney Modular Character Pack** (CC0 / public domain, free for commercial use, no attribution required) — ~425 sprites covering swappable heads/hair/torsos/pants/shoes/accessories, purpose-built for this kind of layering.

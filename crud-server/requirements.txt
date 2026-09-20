@@ -1,5 +1,7 @@
 flask>=3.0
+flask-cors>=4.0
 pydantic>=2
+email-validator>=2.1
 sqlalchemy>=2
 alembic>=1.13
 psycopg[binary]>=3.1

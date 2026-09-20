@@ -17,7 +17,7 @@ Set up the monorepo structure and base tooling. No feature logic yet.
 - `git init` done, initial commit made
 - `docker-compose up` starts all five services without errors
 
-## Phase 1 — Identity ⬜
+## Phase 1 — Identity ✅
 Accounts, auth, JWT issuance/verification. Everything else depends on a user existing.
 
 **Deliverable:** a user can sign up, log in, and stay logged in across a refresh; the game server can independently verify a JWT it's handed.
@@ -74,6 +74,9 @@ Persisted, customizable characters, rendered seated at the room's table.
 - Room view replaces the plain member list with seated, rendered characters for everyone present
 - Character edits are reflected the next time the room is viewed/joined (no live mid-session update required for MVP)
 - Per-user room-creation rate limit enforced (extends Phase 3's rate-limiting approach)
+- Signup flow (built in Phase 1 without this step) is reworked to insert a required character-creation step — signup isn't complete until a character is designed, no skip
+- Login/signup screen background is revisited: swap the current placeholder gradient for a tiled view of rendered avatars seated in rooms, now that character/room rendering actually exists
+- Landing page's room-card thumbnails (currently an abstract gradient placeholder) are revisited: swap in an actual live/rendered preview of each room's table, now that room/character rendering actually exists
 
 ## Phase 6 — Hardening & deployment ⬜
 Get the full stack running for real, outside localhost.
