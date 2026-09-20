@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 import room.service as service
 from auth import require_auth
+from room.broadcast import broadcast_room_state
 from room.schemas import CreateRoomRequest, DesignateSuccessorRequest, RoomDetail, RoomSummary
 
 room_bp = Blueprint("room", __name__, url_prefix="/rooms")
@@ -70,6 +71,7 @@ def leave(room_id: str):
     except service.NotMemberError:
         return jsonify(error="Not a member of this room"), 403
 
+    broadcast_room_state(room_id, room)
     return jsonify(RoomDetail.from_room(room).model_dump() if room else None)
 
 
@@ -90,4 +92,5 @@ def designate_successor(room_id: str):
     except service.NotMemberError:
         return jsonify(error="Target user is not a member of this room"), 400
 
+    broadcast_room_state(room_id, room)
     return jsonify(RoomDetail.from_room(room).model_dump())

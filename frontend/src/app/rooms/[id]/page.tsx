@@ -84,6 +84,7 @@ export default function RoomViewPage() {
                 key={member.user_id}
                 member={member}
                 isHost={member.user_id === room.host_id}
+                isDesignatedSuccessor={member.user_id === room.designated_successor_id}
                 showMakeHost={room.host_id === user.userId && member.user_id !== user.userId}
                 onMakeHost={() => handleMakeHost(member.user_id)}
               />

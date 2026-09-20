@@ -4,11 +4,13 @@ import type { Member } from '@/lib/gameApi';
 export function MemberRow({
   member,
   isHost,
+  isDesignatedSuccessor,
   showMakeHost,
   onMakeHost,
 }: {
   member: Member;
   isHost: boolean;
+  isDesignatedSuccessor: boolean;
   showMakeHost: boolean;
   onMakeHost: () => void;
 }) {
@@ -29,10 +31,18 @@ export function MemberRow({
             Host
           </span>
         )}
+        {isDesignatedSuccessor && (
+          <span className="rounded-full bg-[#7C5CFF]/15 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.3px] text-[#7C5CFF] uppercase">
+            Next Host
+          </span>
+        )}
       </div>
       {showMakeHost && (
-        <button onClick={onMakeHost} className="text-[13px] font-bold text-[#9A9AA5]">
-          Make Host
+        <button
+          onClick={onMakeHost}
+          className="cursor-pointer text-[13px] font-bold text-[#9A9AA5] hover:text-foreground"
+        >
+          {isDesignatedSuccessor ? 'Next Host ✓' : 'Set as Next Host'}
         </button>
       )}
     </div>
