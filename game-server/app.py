@@ -3,7 +3,7 @@ from flask_cors import CORS
 
 from config import Config
 from extensions import socketio
-from room.routes import room_bp
+from room.routes import room_bp, rtc_bp
 from room.sockets import register_socket_handlers
 
 
@@ -13,6 +13,7 @@ def create_app() -> Flask:
     CORS(app, origins=[Config.FRONTEND_ORIGIN])
 
     app.register_blueprint(room_bp)
+    app.register_blueprint(rtc_bp)
 
     socketio.init_app(app)
     register_socket_handlers(socketio)

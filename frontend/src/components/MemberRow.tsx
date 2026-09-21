@@ -1,3 +1,4 @@
+import { VoiceStatus } from '@/components/VoiceStatus';
 import { avatarColorFor } from '@/lib/avatarColor';
 import type { Member } from '@/lib/gameApi';
 
@@ -7,12 +8,16 @@ export function MemberRow({
   isDesignatedSuccessor,
   showMakeHost,
   onMakeHost,
+  voiceState,
+  isSelf,
 }: {
   member: Member;
   isHost: boolean;
   isDesignatedSuccessor: boolean;
   showMakeHost: boolean;
   onMakeHost: () => void;
+  voiceState: RTCPeerConnectionState | undefined;
+  isSelf: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#2C2C34] bg-[#1B1B20] px-4.5 py-3.5">
@@ -25,7 +30,10 @@ export function MemberRow({
             {member.username[0]?.toUpperCase()}
           </span>
         </div>
-        <span className="text-[15px] font-bold text-foreground">{member.username}</span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[15px] font-bold text-foreground">{member.username}</span>
+          {!isSelf && <VoiceStatus state={voiceState} />}
+        </div>
         {isHost && (
           <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.3px] text-accent uppercase">
             Host

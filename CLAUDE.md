@@ -56,11 +56,21 @@ A host can designate a successor (`POST /rooms/<id>/designate-successor`). When 
 
 ### Socket.IO channel
 
-Carries presence (Phase 2) and text chat (Phase 3); WebRTC signaling lands here in Phase 4. Client emits `join_room {token, room_id}` after a successful REST join; the server maps socket sid → `(room_id, user_id)` in an in-process dict (`game-server/room/sockets.py: _sid_presence` — not persisted, single-process only) and joins the Socket.IO room for broadcast grouping. Every room state change broadcasts one `room_updated` event carrying the full room detail, rather than granular per-action events.
+Carries presence (Phase 2), text chat (Phase 3), and WebRTC signaling (Phase 4). Client emits `join_room {token, room_id}` after a successful REST join; the server maps socket sid → `(room_id, user_id)` in an in-process dict (`game-server/room/sockets.py: _sid_presence` — not persisted, single-process only) and joins the Socket.IO room for broadcast grouping. Every room state change broadcasts one `room_updated` event carrying the full room detail, rather than granular per-action events.
 
-Events: server → client `room_updated`, `room_closed`, `chat_history` (sent only to the joining sid, right after `join_room`), `chat_message`, `error`. Client → server `join_room`, `send_message {token, room_id, body}`.
+Events: server → client `room_updated`, `room_closed`, `chat_history` (sent only to the joining sid, right after `join_room`), `chat_message`, `webrtc_signal`, `error`. Client → server `join_room`, `send_message {token, room_id, body}`, `webrtc_signal {token, room_id, target_user_id, signal}`.
 
 Each client event carries its own `token` rather than relying on the sid mapping, because a socket's identity is only established by `join_room` and the same pattern has to work for the pre-join case.
+
+### WebRTC voice (Phase 4)
+
+P2P mesh. The server only relays: `webrtc_signal` is addressed to one peer via `_presence_sids` (the reverse of `_sid_presence`, in `room/sockets.py`), checks both ends are room members, and forwards `signal` without inspecting it. `GET /rtc/ice-servers` (`rtc_bp`, authenticated) hands clients the STUN/TURN config from `Config.STUN_URL` / `TURN_URL` / `TURN_USERNAME` / `TURN_CREDENTIAL`.
+
+`frontend/src/hooks/useVoiceChat.ts` drives the mesh off the member list in `room_updated` — no separate peer-join events. Both ends of a pair build a connection from the same list, so **the peer with the lexicographically lower `user_id` sends the offer**; without that rule both would offer at once and the negotiations collide. Members that disappear from the list get their connection closed, which is also how leaving tears a peer down.
+
+Signals are `{description}` or `{candidate}` — remote ICE candidates arriving before `setRemoteDescription` are queued in `pendingCandidates` and flushed after, since `addIceCandidate` throws without a remote description.
+
+**Dev-environment caveats:** TURN credentials are static (`coturn:changeme` in `docker-compose.yml`), not the time-limited `use-auth-secret` kind — fine locally, should change before deployment (Phase 6). On macOS, coturn's `network_mode: host` means "host" is the Docker VM, not macOS, so relay addresses it allocates are VM-internal; loopback peers are also denied by coturn's default policy, so `turnutils_uclient` against 127.0.0.1 returns 403 on channel bind even though allocation succeeds.
 
 **Dev-server caveat:** `app.py` runs Flask-SocketIO with `debug=True`, which serves via Werkzeug and can't perform the websocket upgrade even though `gevent-websocket` is installed. Browsers silently fall back to long-polling, so this is invisible in the app, but non-browser Socket.IO clients may fail on the upgrade probe unless pinned to `transports=["polling"]`.
 

@@ -3,10 +3,34 @@ from pydantic import ValidationError
 
 import room.service as service
 from auth import require_auth
+from config import Config
 from room.broadcast import broadcast_room_state
-from room.schemas import CreateRoomRequest, DesignateSuccessorRequest, RoomDetail, RoomSummary
+from room.schemas import (
+    CreateRoomRequest,
+    DesignateSuccessorRequest,
+    IceServer,
+    RoomDetail,
+    RoomSummary,
+)
 
 room_bp = Blueprint("room", __name__, url_prefix="/rooms")
+rtc_bp = Blueprint("rtc", __name__, url_prefix="/rtc")
+
+
+@rtc_bp.get("/ice-servers")
+@require_auth
+def ice_servers():
+    servers = [
+        IceServer(urls=Config.STUN_URL),
+        IceServer(
+            urls=Config.TURN_URL,
+            username=Config.TURN_USERNAME,
+            credential=Config.TURN_CREDENTIAL,
+        ),
+    ]
+    # A null username/credential on the STUN entry is not merely redundant —
+    # some browsers reject the RTCIceServer outright rather than ignoring it.
+    return jsonify([s.model_dump(exclude_none=True) for s in servers])
 
 
 @room_bp.get("")

@@ -51,14 +51,14 @@ Real-time messaging inside a room over the Socket.IO channel already established
 - Per-user message-rate limit enforced via Redis counters (set to 20 messages per minute, fixed window — `Config.CHAT_RATE_LIMIT_PER_MINUTE`)
 - Frontend room view has a working chat panel
 
-## Phase 4 — Voice chat (WebRTC) ⬜
+## Phase 4 — Voice chat (WebRTC) ✅
 P2P mesh voice between room members, signaled over the same Socket.IO channel.
 
 **Deliverable:** users in a room can hear each other.
 
 **Acceptance criteria:**
 - Two clients on the same network establish a direct P2P audio connection via signaling relayed through the game server
-- Two clients separated by NAT successfully connect via the self-hosted coturn TURN fallback
+- Two clients separated by NAT successfully connect via the self-hosted coturn TURN fallback — **partially verified:** coturn grants a relay allocation with the credentials the game server issues, and clients are configured with it as fallback, but an actual NAT-separated connection can't be exercised on one machine. Confirm alongside the Phase 6 criterion "coturn reachable and functioning from outside the VPS's local network."
 - Leaving a room cleanly tears down that user's peer connections
 - Frontend has mute/unmute and per-member connection-status indicators
 

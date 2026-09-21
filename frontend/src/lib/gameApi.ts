@@ -70,6 +70,10 @@ export function leaveRoom(token: string, roomId: string) {
   return request<RoomDetail | null>(`/rooms/${roomId}/leave`, token, { method: 'POST' });
 }
 
+export function getIceServers(token: string) {
+  return request<RTCIceServer[]>('/rtc/ice-servers', token);
+}
+
 export function designateSuccessor(token: string, roomId: string, userId: string) {
   return request<RoomDetail>(`/rooms/${roomId}/designate-successor`, token, {
     method: 'POST',

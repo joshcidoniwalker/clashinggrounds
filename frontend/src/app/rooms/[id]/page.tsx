@@ -5,17 +5,22 @@ import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { ChatPanel } from '@/components/ChatPanel';
 import { MemberRow } from '@/components/MemberRow';
+import { RemoteAudio } from '@/components/RemoteAudio';
 import { TopBar } from '@/components/TopBar';
 import { useAuthUser } from '@/hooks/useAuthUser';
+import { useVoiceChat } from '@/hooks/useVoiceChat';
 import { clearToken } from '@/lib/auth';
 import {
   GAME_API_URL,
   designateSuccessor,
+  getIceServers,
   getRoom,
   leaveRoom,
   type ChatMessage,
   type RoomDetail,
 } from '@/lib/gameApi';
+
+const NO_MEMBERS: RoomDetail['members'] = [];
 
 export default function RoomViewPage() {
   const router = useRouter();
@@ -24,7 +29,14 @@ export default function RoomViewPage() {
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [iceServers, setIceServers] = useState<RTCIceServer[] | null>(null);
   const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    getIceServers(user.token).then(setIceServers);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -35,10 +47,14 @@ export default function RoomViewPage() {
     socketRef.current = socket;
 
     // Re-emitted on every reconnect, not just the first connect, so a dropped
-    // socket rejoins the broadcast group and re-fetches the chat buffer.
+    // socket rejoins the broadcast group and re-fetches the chat buffer. The
+    // socket is only handed to the voice mesh once connected, so signaling
+    // never fires into a socket the server hasn't placed in the room yet.
     socket.on('connect', () => {
       socket.emit('join_room', { token: user.token, room_id: params.id });
+      setSocket(socket);
     });
+    socket.on('disconnect', () => setSocket(null));
     socket.on('room_updated', (data: RoomDetail) => setRoom(data));
     socket.on('room_closed', () => router.push('/rooms'));
     socket.on('chat_history', (history: ChatMessage[]) => setMessages(history));
@@ -50,8 +66,18 @@ export default function RoomViewPage() {
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setSocket(null);
     };
   }, [user, params.id, router]);
+
+  const { micEnabled, toggleMic, micError, peerStates, remoteStreams } = useVoiceChat({
+    socket,
+    roomId: params.id,
+    token: user?.token ?? '',
+    userId: user?.userId ?? '',
+    members: room?.members ?? NO_MEMBERS,
+    iceServers,
+  });
 
   function handleLogout() {
     clearToken();
@@ -97,13 +123,26 @@ export default function RoomViewPage() {
                 {room.members.length}/{room.capacity} members
               </span>
             </div>
-            <button
-              onClick={handleLeave}
-              className="rounded-full border border-[#34343D] px-5.5 py-2.5 text-sm font-extrabold text-foreground"
-            >
-              Leave Room
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleMic}
+                aria-pressed={!micEnabled}
+                className={`rounded-full px-5.5 py-2.5 text-sm font-extrabold ${
+                  micEnabled ? 'border border-[#34343D] text-foreground' : 'bg-[#FF3B30] text-white'
+                }`}
+              >
+                {micEnabled ? 'Mute' : 'Unmute'}
+              </button>
+              <button
+                onClick={handleLeave}
+                className="rounded-full border border-[#34343D] px-5.5 py-2.5 text-sm font-extrabold text-foreground"
+              >
+                Leave Room
+              </button>
+            </div>
           </div>
+
+          {micError && <p className="text-sm text-red-400">{micError}</p>}
 
           <div className="flex items-start gap-6">
             <div className="flex flex-1 flex-col gap-2.5">
@@ -115,6 +154,8 @@ export default function RoomViewPage() {
                   isDesignatedSuccessor={member.user_id === room.designated_successor_id}
                   showMakeHost={room.host_id === user.userId && member.user_id !== user.userId}
                   onMakeHost={() => handleMakeHost(member.user_id)}
+                  voiceState={peerStates[member.user_id]}
+                  isSelf={member.user_id === user.userId}
                 />
               ))}
             </div>
@@ -130,6 +171,10 @@ export default function RoomViewPage() {
           </div>
         </div>
       </div>
+
+      {Object.entries(remoteStreams).map(([peerId, stream]) => (
+        <RemoteAudio key={peerId} stream={stream} />
+      ))}
     </div>
   );
 }

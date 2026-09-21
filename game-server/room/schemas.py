@@ -19,6 +19,17 @@ class SendMessageRequest(BaseModel):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
 
+class IceServer(BaseModel):
+    urls: str
+    username: str | None = None
+    credential: str | None = None
+
+
+class SignalRequest(BaseModel):
+    target_user_id: str
+    signal: dict
+
+
 class ChatMessageResponse(BaseModel):
     room_id: str
     sender_id: str
