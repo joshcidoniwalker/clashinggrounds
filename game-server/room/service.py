@@ -1,8 +1,10 @@
 import uuid
+from dataclasses import asdict
+from datetime import UTC, datetime
 
 import room.repository as repo
 from config import Config
-from room.models import Member, Room
+from room.models import ChatMessage, Member, Room
 
 
 class RoomNotFoundError(Exception):
@@ -22,6 +24,10 @@ class NotMemberError(Exception):
 
 
 class InvalidCapacityError(Exception):
+    pass
+
+
+class RateLimitedError(Exception):
     pass
 
 
@@ -114,3 +120,26 @@ def designate_successor(room_id: str, host_id: str, target_user_id: str) -> Room
 
     repo.set_designated_successor(room_id, target_user_id)
     return _load_room(room_id)
+
+
+def send_message(room_id: str, user_id: str, username: str, body: str) -> ChatMessage:
+    if not repo.room_exists(room_id):
+        raise RoomNotFoundError(room_id)
+    if not repo.is_member(room_id, user_id):
+        raise NotMemberError(user_id)
+    if repo.increment_chat_count(user_id) > Config.CHAT_RATE_LIMIT_PER_MINUTE:
+        raise RateLimitedError(user_id)
+
+    message = ChatMessage(
+        room_id=room_id,
+        sender_id=user_id,
+        sender_username=username,
+        body=body,
+        sent_at=datetime.now(UTC).isoformat(),
+    )
+    repo.append_message(room_id, asdict(message))
+    return message
+
+
+def get_chat_history(room_id: str) -> list[ChatMessage]:
+    return [ChatMessage(**fields) for fields in repo.get_messages(room_id)]

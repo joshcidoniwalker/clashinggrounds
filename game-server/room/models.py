@@ -8,6 +8,15 @@ class Member:
 
 
 @dataclass
+class ChatMessage:
+    room_id: str
+    sender_id: str
+    sender_username: str
+    body: str
+    sent_at: str
+
+
+@dataclass
 class Room:
     id: str
     name: str

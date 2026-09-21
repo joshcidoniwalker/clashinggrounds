@@ -1,5 +1,7 @@
+import json
 import time
 
+from config import Config
 from redis_client import redis_client
 
 ROOMS_INDEX = "rooms:index"
@@ -15,6 +17,14 @@ def _member_order_key(room_id: str) -> str:
 
 def _member_names_key(room_id: str) -> str:
     return f"room:{room_id}:member_names"
+
+
+def _chat_key(room_id: str) -> str:
+    return f"room:{room_id}:chat"
+
+
+def _chat_rate_key(user_id: str) -> str:
+    return f"rate:chat:{user_id}"
 
 
 def room_exists(room_id: str) -> bool:
@@ -94,5 +104,28 @@ def delete_room(room_id: str) -> None:
     pipe.delete(_room_key(room_id))
     pipe.delete(_member_order_key(room_id))
     pipe.delete(_member_names_key(room_id))
+    pipe.delete(_chat_key(room_id))
     pipe.srem(ROOMS_INDEX, room_id)
     pipe.execute()
+
+
+def append_message(room_id: str, message: dict) -> None:
+    pipe = redis_client.pipeline()
+    pipe.rpush(_chat_key(room_id), json.dumps(message))
+    pipe.ltrim(_chat_key(room_id), -Config.CHAT_BUFFER_SIZE, -1)
+    pipe.execute()
+
+
+def get_messages(room_id: str) -> list[dict]:
+    """Oldest message first."""
+    return [json.loads(raw) for raw in redis_client.lrange(_chat_key(room_id), 0, -1)]
+
+
+def increment_chat_count(user_id: str) -> int:
+    """Fixed one-minute window: the TTL is set when the window's first message
+    lands, so the count expires a minute after that rather than sliding."""
+    key = _chat_rate_key(user_id)
+    count = redis_client.incr(key)
+    if count == 1:
+        redis_client.expire(key, 60)
+    return count

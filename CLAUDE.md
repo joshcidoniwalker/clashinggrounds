@@ -46,15 +46,23 @@ Full requirements, architecture decisions, and design specs: `docs/PROJECT.md`. 
 - `room:{id}` — hash: `name`, `capacity`, `host_id`, `designated_successor_id`, `created_at`
 - `room:{id}:member_order` — sorted set, `user_id → join timestamp` (oldest = longest-tenured; used as the host-handoff fallback)
 - `room:{id}:member_names` — hash, `user_id → username`
+- `room:{id}:chat` — list of JSON messages, oldest first; `RPUSH` + `LTRIM` caps it at `Config.CHAT_BUFFER_SIZE` (50)
 - `rooms:index` — set of all active room ids (browse)
+- `rate:chat:{user_id}` — counter with a 60s TTL set on the window's first message (fixed window, not sliding); caps chat at `Config.CHAT_RATE_LIMIT_PER_MINUTE` (20)
 
 ### Host handoff
 
 A host can designate a successor (`POST /rooms/<id>/designate-successor`). When the host leaves — either an explicit `POST /rooms/<id>/leave` or a Socket.IO disconnect — the designated successor is promoted if still present, else the longest-tenured remaining member (`game-server/room/service.py: leave_room`). A room with zero members is deleted from Redis immediately.
 
-### Socket.IO is presence-only for now
+### Socket.IO channel
 
-The channel exists from Phase 2 purely to detect disconnects for host handoff — no chat messages flow over it yet (that's Phase 3). Client emits `join_room {token, room_id}` after a successful REST join; the server maps socket sid → `(room_id, user_id)` in an in-process dict (`game-server/room/sockets.py: _sid_presence` — not persisted, single-process only) and joins the Socket.IO room for broadcast grouping. Every state change broadcasts one `room_updated` event carrying the full room detail, rather than granular per-action events.
+Carries presence (Phase 2) and text chat (Phase 3); WebRTC signaling lands here in Phase 4. Client emits `join_room {token, room_id}` after a successful REST join; the server maps socket sid → `(room_id, user_id)` in an in-process dict (`game-server/room/sockets.py: _sid_presence` — not persisted, single-process only) and joins the Socket.IO room for broadcast grouping. Every room state change broadcasts one `room_updated` event carrying the full room detail, rather than granular per-action events.
+
+Events: server → client `room_updated`, `room_closed`, `chat_history` (sent only to the joining sid, right after `join_room`), `chat_message`, `error`. Client → server `join_room`, `send_message {token, room_id, body}`.
+
+Each client event carries its own `token` rather than relying on the sid mapping, because a socket's identity is only established by `join_room` and the same pattern has to work for the pre-join case.
+
+**Dev-server caveat:** `app.py` runs Flask-SocketIO with `debug=True`, which serves via Werkzeug and can't perform the websocket upgrade even though `gevent-websocket` is installed. Browsers silently fall back to long-polling, so this is invisible in the app, but non-browser Socket.IO clients may fail on the upgrade probe unless pinned to `transports=["polling"]`.
 
 ### Frontend auth
 

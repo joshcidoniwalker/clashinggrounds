@@ -1,6 +1,9 @@
-from pydantic import BaseModel, Field
+from dataclasses import asdict
+from typing import Annotated
 
-from room.models import Room
+from pydantic import BaseModel, Field, StringConstraints
+
+from room.models import ChatMessage, Room
 
 
 class CreateRoomRequest(BaseModel):
@@ -10,6 +13,22 @@ class CreateRoomRequest(BaseModel):
 
 class DesignateSuccessorRequest(BaseModel):
     user_id: str
+
+
+class SendMessageRequest(BaseModel):
+    body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class ChatMessageResponse(BaseModel):
+    room_id: str
+    sender_id: str
+    sender_username: str
+    body: str
+    sent_at: str
+
+    @classmethod
+    def from_message(cls, message: ChatMessage) -> "ChatMessageResponse":
+        return cls(**asdict(message))
 
 
 class MemberResponse(BaseModel):

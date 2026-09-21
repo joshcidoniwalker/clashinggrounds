@@ -39,7 +39,7 @@ Room creation, browsing, joining, capacity, host handoff — all via the game se
 - A room with zero members is deleted from Redis immediately
 - Frontend has a room browser (list + create form) and a bare room view showing the current member list (plain text, no avatars yet)
 
-## Phase 3 — Text chat ⬜
+## Phase 3 — Text chat ✅
 Real-time messaging inside a room over the Socket.IO channel already established in Phase 2's room context.
 
 **Deliverable:** members of the same room exchange real-time text messages; a reconnecting client catches up on recent history.
@@ -48,7 +48,7 @@ Real-time messaging inside a room over the Socket.IO channel already established
 - Messages (`{room_id, sender_id, body, sent_at}`) delivered to all room members in real time
 - Redis rolling buffer caps at 50 messages per room, oldest evicted first
 - A client that reconnects mid-session receives the buffered messages
-- Per-user message-rate limit enforced via Redis counters (basic cap, exact threshold TBD)
+- Per-user message-rate limit enforced via Redis counters (set to 20 messages per minute, fixed window — `Config.CHAT_RATE_LIMIT_PER_MINUTE`)
 - Frontend room view has a working chat panel
 
 ## Phase 4 — Voice chat (WebRTC) ⬜

@@ -14,6 +14,14 @@ export type RoomSummary = {
   member_count: number;
 };
 
+export type ChatMessage = {
+  room_id: string;
+  sender_id: string;
+  sender_username: string;
+  body: string;
+  sent_at: string;
+};
+
 export type RoomDetail = {
   id: string;
   name: string;

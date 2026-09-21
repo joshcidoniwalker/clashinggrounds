@@ -7,3 +7,5 @@ class Config:
     FRONTEND_ORIGIN: str = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
     ROOM_MIN_CAPACITY: int = 2
     ROOM_MAX_CAPACITY: int = 12
+    CHAT_BUFFER_SIZE: int = 50
+    CHAT_RATE_LIMIT_PER_MINUTE: int = 20

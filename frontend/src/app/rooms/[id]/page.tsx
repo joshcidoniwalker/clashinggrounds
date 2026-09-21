@@ -1,8 +1,9 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import { ChatPanel } from '@/components/ChatPanel';
 import { MemberRow } from '@/components/MemberRow';
 import { TopBar } from '@/components/TopBar';
 import { useAuthUser } from '@/hooks/useAuthUser';
@@ -12,6 +13,7 @@ import {
   designateSuccessor,
   getRoom,
   leaveRoom,
+  type ChatMessage,
   type RoomDetail,
 } from '@/lib/gameApi';
 
@@ -20,6 +22,9 @@ export default function RoomViewPage() {
   const params = useParams<{ id: string }>();
   const user = useAuthUser();
   const [room, setRoom] = useState<RoomDetail | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -27,12 +32,24 @@ export default function RoomViewPage() {
     getRoom(user.token, params.id).then(setRoom);
 
     const socket: Socket = io(GAME_API_URL);
-    socket.emit('join_room', { token: user.token, room_id: params.id });
+    socketRef.current = socket;
+
+    // Re-emitted on every reconnect, not just the first connect, so a dropped
+    // socket rejoins the broadcast group and re-fetches the chat buffer.
+    socket.on('connect', () => {
+      socket.emit('join_room', { token: user.token, room_id: params.id });
+    });
     socket.on('room_updated', (data: RoomDetail) => setRoom(data));
     socket.on('room_closed', () => router.push('/rooms'));
+    socket.on('chat_history', (history: ChatMessage[]) => setMessages(history));
+    socket.on('chat_message', (message: ChatMessage) => {
+      setMessages((current) => [...current, message]);
+    });
+    socket.on('error', (data: { error: string }) => setChatError(data.error));
 
     return () => {
       socket.disconnect();
+      socketRef.current = null;
     };
   }, [user, params.id, router]);
 
@@ -53,6 +70,16 @@ export default function RoomViewPage() {
     setRoom(updated);
   }
 
+  function handleSend(body: string) {
+    if (!user) return;
+    setChatError(null);
+    socketRef.current?.emit('send_message', {
+      token: user.token,
+      room_id: params.id,
+      body,
+    });
+  }
+
   if (!user || !room) {
     return null;
   }
@@ -62,7 +89,7 @@ export default function RoomViewPage() {
       <TopBar username={user.username} onLogout={handleLogout} />
 
       <div className="flex justify-center px-12 pt-11 pb-10">
-        <div className="flex w-full max-w-[720px] flex-col gap-7">
+        <div className="flex w-full max-w-[1040px] flex-col gap-7">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1.5">
               <h1 className="font-display text-2xl font-bold text-foreground">{room.name}</h1>
@@ -78,17 +105,28 @@ export default function RoomViewPage() {
             </button>
           </div>
 
-          <div className="flex flex-col gap-2.5">
-            {room.members.map((member) => (
-              <MemberRow
-                key={member.user_id}
-                member={member}
-                isHost={member.user_id === room.host_id}
-                isDesignatedSuccessor={member.user_id === room.designated_successor_id}
-                showMakeHost={room.host_id === user.userId && member.user_id !== user.userId}
-                onMakeHost={() => handleMakeHost(member.user_id)}
+          <div className="flex items-start gap-6">
+            <div className="flex flex-1 flex-col gap-2.5">
+              {room.members.map((member) => (
+                <MemberRow
+                  key={member.user_id}
+                  member={member}
+                  isHost={member.user_id === room.host_id}
+                  isDesignatedSuccessor={member.user_id === room.designated_successor_id}
+                  showMakeHost={room.host_id === user.userId && member.user_id !== user.userId}
+                  onMakeHost={() => handleMakeHost(member.user_id)}
+                />
+              ))}
+            </div>
+
+            <div className="w-[400px] shrink-0">
+              <ChatPanel
+                messages={messages}
+                currentUserId={user.userId}
+                error={chatError}
+                onSend={handleSend}
               />
-            ))}
+            </div>
           </div>
         </div>
       </div>
