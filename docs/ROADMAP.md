@@ -62,7 +62,7 @@ P2P mesh voice between room members, signaled over the same Socket.IO channel.
 - Leaving a room cleanly tears down that user's peer connections
 - Frontend has mute/unmute and per-member connection-status indicators
 
-## Phase 5 — Room table UI ⬜
+## Phase 5 — Room table UI ✅
 Redesign the room view around a shared table, with placeholder avatars standing in for characters. Kept separate from the character system so the room layout can be settled (and committed) before committing to an art pack.
 
 **Deliverable:** the room view shows everyone present seated around a table, with host/successor status, voice state, and host controls carried over from the current member list.
