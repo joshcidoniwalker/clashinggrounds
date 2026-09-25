@@ -1,15 +1,17 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { ChatPanel } from '@/components/ChatPanel';
-import { MemberRow } from '@/components/MemberRow';
+import { ParticipantsPanel } from '@/components/ParticipantsPanel';
 import { RemoteAudio } from '@/components/RemoteAudio';
-import { TopBar } from '@/components/TopBar';
+import { RoomHeader } from '@/components/RoomHeader';
+import { RoomTable } from '@/components/RoomTable';
+import type { SeatView } from '@/components/Seat';
 import { useAuthUser } from '@/hooks/useAuthUser';
+import { useSpeaking } from '@/hooks/useSpeaking';
 import { useVoiceChat } from '@/hooks/useVoiceChat';
-import { clearToken } from '@/lib/auth';
 import {
   GAME_API_URL,
   designateSuccessor,
@@ -19,8 +21,17 @@ import {
   type ChatMessage,
   type RoomDetail,
 } from '@/lib/gameApi';
+import { seatVoiceFor } from '@/lib/seatVoice';
 
 const NO_MEMBERS: RoomDetail['members'] = [];
+
+type SidePanel = 'chat' | 'participants' | null;
+
+// Clicking the table or pressing Esc dismisses the participants list the way
+// it would a menu, but leaves chat alone — chat is meant to stay up.
+function closingParticipants(current: SidePanel): SidePanel {
+  return current === 'participants' ? null : current;
+}
 
 export default function RoomViewPage() {
   const router = useRouter();
@@ -31,6 +42,8 @@ export default function RoomViewPage() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [iceServers, setIceServers] = useState<RTCIceServer[] | null>(null);
+  const [sidePanel, setSidePanel] = useState<SidePanel>('chat');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -70,7 +83,7 @@ export default function RoomViewPage() {
     };
   }, [user, params.id, router]);
 
-  const { micEnabled, toggleMic, micError, peerStates, remoteStreams } = useVoiceChat({
+  const { micEnabled, toggleMic, micError, peerStates, remoteStreams, localStream } = useVoiceChat({
     socket,
     roomId: params.id,
     token: user?.token ?? '',
@@ -79,9 +92,37 @@ export default function RoomViewPage() {
     iceServers,
   });
 
-  function handleLogout() {
-    clearToken();
-    router.push('/login');
+  const selfMuted = !micEnabled || micError !== null;
+
+  useEffect(() => {
+    if (!socket || !user) return;
+    socket.emit('set_muted', { token: user.token, room_id: params.id, muted: selfMuted });
+  }, [socket, user, params.id, selfMuted]);
+
+  const audioStreams = useMemo(
+    () => (user && localStream ? { ...remoteStreams, [user.userId]: localStream } : remoteStreams),
+    [remoteStreams, localStream, user],
+  );
+  const speaking = useSpeaking(audioStreams);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setSelectedId(null);
+      setSidePanel(closingParticipants);
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  function dismissOverlays() {
+    setSelectedId(null);
+    setSidePanel(closingParticipants);
+  }
+
+  function togglePanel(panel: Exclude<SidePanel, null>) {
+    setSelectedId(null);
+    setSidePanel((current) => (current === panel ? null : panel));
   }
 
   async function handleLeave() {
@@ -110,67 +151,77 @@ export default function RoomViewPage() {
     return null;
   }
 
+  const seats: SeatView[] = room.members.map((member) => {
+    const isSelf = member.user_id === user.userId;
+    return {
+      member,
+      isSelf,
+      isHost: member.user_id === room.host_id,
+      isNextHost: member.user_id === room.designated_successor_id,
+      voice: seatVoiceFor({
+        isSelf,
+        selfMuted,
+        muted: member.muted,
+        peerState: peerStates[member.user_id],
+      }),
+      speaking: speaking.has(member.user_id),
+    };
+  });
+  const viewerSeat = room.members.find((member) => member.user_id === user.userId)?.seat ?? 0;
+  const isHost = room.host_id === user.userId;
+
   return (
-    <div className="min-h-screen bg-[#0F0F12]">
-      <TopBar username={user.username} onLogout={handleLogout} />
+    <div className="relative h-screen overflow-hidden bg-background">
+      <RoomTable
+        capacity={room.capacity}
+        viewerSeat={viewerSeat}
+        seats={seats}
+        selectedId={selectedId}
+        canDesignate={isHost}
+        onSelect={(userId) => setSelectedId((current) => (current === userId ? null : userId))}
+        onDismiss={dismissOverlays}
+        onMakeHost={handleMakeHost}
+      />
 
-      <div className="flex justify-center px-12 pt-11 pb-10">
-        <div className="flex w-full max-w-[1040px] flex-col gap-7">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1.5">
-              <h1 className="font-display text-2xl font-bold text-foreground">{room.name}</h1>
-              <span className="text-sm text-[#9A9AA5]">
-                {room.members.length}/{room.capacity} members
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={toggleMic}
-                aria-pressed={!micEnabled}
-                className={`rounded-full px-5.5 py-2.5 text-sm font-extrabold ${
-                  micEnabled ? 'border border-[#34343D] text-foreground' : 'bg-[#FF3B30] text-white'
-                }`}
-              >
-                {micEnabled ? 'Mute' : 'Unmute'}
-              </button>
-              <button
-                onClick={handleLeave}
-                className="rounded-full border border-[#34343D] px-5.5 py-2.5 text-sm font-extrabold text-foreground"
-              >
-                Leave Room
-              </button>
-            </div>
-          </div>
+      <RoomHeader
+        name={room.name}
+        memberCount={room.members.length}
+        capacity={room.capacity}
+        micEnabled={micEnabled}
+        chatOpen={sidePanel === 'chat'}
+        participantsOpen={sidePanel === 'participants'}
+        onLeave={handleLeave}
+        onToggleMic={toggleMic}
+        onToggleChat={() => togglePanel('chat')}
+        onToggleParticipants={() => togglePanel('participants')}
+      />
 
-          {micError && <p className="text-sm text-red-400">{micError}</p>}
-
-          <div className="flex items-start gap-6">
-            <div className="flex flex-1 flex-col gap-2.5">
-              {room.members.map((member) => (
-                <MemberRow
-                  key={member.user_id}
-                  member={member}
-                  isHost={member.user_id === room.host_id}
-                  isDesignatedSuccessor={member.user_id === room.designated_successor_id}
-                  showMakeHost={room.host_id === user.userId && member.user_id !== user.userId}
-                  onMakeHost={() => handleMakeHost(member.user_id)}
-                  voiceState={peerStates[member.user_id]}
-                  isSelf={member.user_id === user.userId}
-                />
-              ))}
-            </div>
-
-            <div className="w-[400px] shrink-0">
-              <ChatPanel
-                messages={messages}
-                currentUserId={user.userId}
-                error={chatError}
-                onSend={handleSend}
-              />
-            </div>
-          </div>
-        </div>
+      <div className="absolute top-[76px] right-4 z-20 max-sm:top-[112px]">
+        {sidePanel === 'chat' && (
+          <ChatPanel
+            messages={messages}
+            currentUserId={user.userId}
+            error={chatError}
+            onSend={handleSend}
+            onHide={() => setSidePanel(null)}
+          />
+        )}
+        {sidePanel === 'participants' && (
+          <ParticipantsPanel
+            seats={seats}
+            capacity={room.capacity}
+            canDesignate={isHost}
+            onMakeHost={handleMakeHost}
+            onClose={() => setSidePanel(null)}
+          />
+        )}
       </div>
+
+      {micError && (
+        <p className="absolute bottom-4 left-4 z-20 max-w-[min(360px,calc(100vw-32px))] rounded-xl bg-black/70 px-3.5 py-2.5 text-sm text-red-400">
+          {micError}
+        </p>
+      )}
 
       {Object.entries(remoteStreams).map(([peerId, stream]) => (
         <RemoteAudio key={peerId} stream={stream} />

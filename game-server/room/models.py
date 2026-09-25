@@ -5,6 +5,8 @@ from dataclasses import dataclass
 class Member:
     user_id: str
     username: str
+    seat: int
+    muted: bool
 
 
 @dataclass

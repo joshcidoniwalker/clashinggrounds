@@ -1,14 +1,7 @@
-const LABELS: Record<string, { text: string; color: string }> = {
-  connected: { text: 'Connected', color: '#2FD675' },
-  connecting: { text: 'Connecting…', color: '#FFB020' },
-  new: { text: 'Connecting…', color: '#FFB020' },
-  disconnected: { text: 'Reconnecting…', color: '#FFB020' },
-  failed: { text: 'Failed', color: '#FF3B30' },
-  closed: { text: 'Disconnected', color: '#6E6E78' },
-};
+import { SEAT_VOICE_LABELS, type SeatVoice } from '@/lib/seatVoice';
 
-export function VoiceStatus({ state }: { state: RTCPeerConnectionState | undefined }) {
-  const label = LABELS[state ?? 'new'] ?? LABELS.new;
+export function VoiceStatus({ voice, speaking }: { voice: SeatVoice; speaking: boolean }) {
+  const label = SEAT_VOICE_LABELS[voice];
 
   return (
     <span className="flex items-center gap-1.5">
@@ -19,6 +12,7 @@ export function VoiceStatus({ state }: { state: RTCPeerConnectionState | undefin
       />
       <span className="text-[11px] font-bold" style={{ color: label.color }}>
         {label.text}
+        {speaking && ' · Speaking'}
       </span>
     </span>
   );

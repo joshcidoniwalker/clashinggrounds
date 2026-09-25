@@ -12,6 +12,21 @@
   --color-accent: var(--accent);
   --font-sans: var(--font-nunito);
   --font-display: var(--font-unbounded);
+  --font-title: var(--font-manrope);
+  --animate-talk: talk 0.6s ease-in-out infinite alternate;
+  --animate-blink: blink 1s infinite;
+
+  @keyframes talk {
+    to {
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0.2;
+    }
+  }
 }
 
 body {

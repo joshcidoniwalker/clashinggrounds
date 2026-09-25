@@ -19,12 +19,24 @@ def _member_names_key(room_id: str) -> str:
     return f"room:{room_id}:member_names"
 
 
+def _seats_key(room_id: str) -> str:
+    return f"room:{room_id}:seats"
+
+
+def _muted_key(room_id: str) -> str:
+    return f"room:{room_id}:muted"
+
+
 def _chat_key(room_id: str) -> str:
     return f"room:{room_id}:chat"
 
 
 def _chat_rate_key(user_id: str) -> str:
     return f"rate:chat:{user_id}"
+
+
+def _room_create_rate_key(user_id: str) -> str:
+    return f"rate:room_create:{user_id}"
 
 
 def room_exists(room_id: str) -> bool:
@@ -47,6 +59,14 @@ def get_member_order(room_id: str) -> list[str]:
 
 def get_member_names(room_id: str) -> dict[str, str]:
     return redis_client.hgetall(_member_names_key(room_id))
+
+
+def get_seats(room_id: str) -> dict[str, int]:
+    return {uid: int(seat) for uid, seat in redis_client.hgetall(_seats_key(room_id)).items()}
+
+
+def get_muted(room_id: str) -> set[str]:
+    return redis_client.smembers(_muted_key(room_id))
 
 
 def member_count(room_id: str) -> int:
@@ -73,14 +93,16 @@ def create_room(
     )
     pipe.zadd(_member_order_key(room_id), {host_id: time.time()})
     pipe.hset(_member_names_key(room_id), host_id, host_username)
+    pipe.hset(_seats_key(room_id), host_id, 0)
     pipe.sadd(ROOMS_INDEX, room_id)
     pipe.execute()
 
 
-def add_member(room_id: str, user_id: str, username: str) -> None:
+def add_member(room_id: str, user_id: str, username: str, seat: int) -> None:
     pipe = redis_client.pipeline()
     pipe.zadd(_member_order_key(room_id), {user_id: time.time()})
     pipe.hset(_member_names_key(room_id), user_id, username)
+    pipe.hset(_seats_key(room_id), user_id, seat)
     pipe.execute()
 
 
@@ -88,7 +110,16 @@ def remove_member(room_id: str, user_id: str) -> None:
     pipe = redis_client.pipeline()
     pipe.zrem(_member_order_key(room_id), user_id)
     pipe.hdel(_member_names_key(room_id), user_id)
+    pipe.hdel(_seats_key(room_id), user_id)
+    pipe.srem(_muted_key(room_id), user_id)
     pipe.execute()
+
+
+def set_muted(room_id: str, user_id: str, muted: bool) -> None:
+    if muted:
+        redis_client.sadd(_muted_key(room_id), user_id)
+    else:
+        redis_client.srem(_muted_key(room_id), user_id)
 
 
 def set_host(room_id: str, host_id: str) -> None:
@@ -104,6 +135,8 @@ def delete_room(room_id: str) -> None:
     pipe.delete(_room_key(room_id))
     pipe.delete(_member_order_key(room_id))
     pipe.delete(_member_names_key(room_id))
+    pipe.delete(_seats_key(room_id))
+    pipe.delete(_muted_key(room_id))
     pipe.delete(_chat_key(room_id))
     pipe.srem(ROOMS_INDEX, room_id)
     pipe.execute()
@@ -121,11 +154,18 @@ def get_messages(room_id: str) -> list[dict]:
     return [json.loads(raw) for raw in redis_client.lrange(_chat_key(room_id), 0, -1)]
 
 
-def increment_chat_count(user_id: str) -> int:
-    """Fixed one-minute window: the TTL is set when the window's first message
+def _increment_fixed_window(key: str) -> int:
+    """Fixed one-minute window: the TTL is set when the window's first action
     lands, so the count expires a minute after that rather than sliding."""
-    key = _chat_rate_key(user_id)
     count = redis_client.incr(key)
     if count == 1:
         redis_client.expire(key, 60)
     return count
+
+
+def increment_chat_count(user_id: str) -> int:
+    return _increment_fixed_window(_chat_rate_key(user_id))
+
+
+def increment_room_create_count(user_id: str) -> int:
+    return _increment_fixed_window(_room_create_rate_key(user_id))

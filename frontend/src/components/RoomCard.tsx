@@ -1,24 +1,5 @@
+import { PeopleIcon } from '@/components/icons';
 import type { RoomSummary } from '@/lib/gameApi';
-
-function PeopleIcon() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#9A9AA5"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="9" cy="8" r="3" />
-      <path d="M2 20c0-3.3 3-5 7-5s7 1.7 7 5" />
-      <circle cx="17" cy="8" r="2.4" />
-      <path d="M16 15.2c2.7.3 4 1.6 4 4.3" />
-    </svg>
-  );
-}
 
 export function RoomCard({
   room,

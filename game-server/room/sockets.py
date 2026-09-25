@@ -7,7 +7,7 @@ import room.service as service
 from auth import InvalidTokenError, verify_token
 from room.broadcast import broadcast_chat_message, broadcast_room_state, send_chat_history
 from room.repository import is_member
-from room.schemas import SendMessageRequest, SignalRequest
+from room.schemas import SendMessageRequest, SetMutedRequest, SignalRequest
 
 # Maps a socket's session id to the (room_id, user_id) it's present in, so a
 # disconnect (tab close, network drop) can trigger the same leave/host-handoff
@@ -69,6 +69,29 @@ def register_socket_handlers(socketio: SocketIO) -> None:
             return
 
         broadcast_chat_message(message)
+
+    @socketio.on("set_muted")
+    def handle_set_muted(data):
+        try:
+            claims = verify_token(data.get("token", ""))
+        except InvalidTokenError:
+            socketio.emit("error", {"error": "Invalid token"}, to=request.sid)
+            return
+
+        try:
+            muted = SetMutedRequest.model_validate(data).muted
+        except ValidationError:
+            socketio.emit("error", {"error": "Invalid mute state"}, to=request.sid)
+            return
+
+        room_id = data.get("room_id")
+        try:
+            room = service.set_muted(room_id, claims["sub"], muted)
+        except (service.RoomNotFoundError, service.NotMemberError):
+            socketio.emit("error", {"error": "Not a member of this room"}, to=request.sid)
+            return
+
+        broadcast_room_state(room_id, room)
 
     @socketio.on("webrtc_signal")
     def handle_webrtc_signal(data):

@@ -58,11 +58,26 @@ P2P mesh voice between room members, signaled over the same Socket.IO channel.
 
 **Acceptance criteria:**
 - Two clients on the same network establish a direct P2P audio connection via signaling relayed through the game server
-- Two clients separated by NAT successfully connect via the self-hosted coturn TURN fallback — **partially verified:** coturn grants a relay allocation with the credentials the game server issues, and clients are configured with it as fallback, but an actual NAT-separated connection can't be exercised on one machine. Confirm alongside the Phase 6 criterion "coturn reachable and functioning from outside the VPS's local network."
+- Two clients separated by NAT successfully connect via the self-hosted coturn TURN fallback — **partially verified:** coturn grants a relay allocation with the credentials the game server issues, and clients are configured with it as fallback, but an actual NAT-separated connection can't be exercised on one machine. Confirm alongside the Phase 7 criterion "coturn reachable and functioning from outside the VPS's local network."
 - Leaving a room cleanly tears down that user's peer connections
 - Frontend has mute/unmute and per-member connection-status indicators
 
-## Phase 5 — Character system ⬜
+## Phase 5 — Room table UI ⬜
+Redesign the room view around a shared table, with placeholder avatars standing in for characters. Kept separate from the character system so the room layout can be settled (and committed) before committing to an art pack.
+
+**Deliverable:** the room view shows everyone present seated around a table, with host/successor status, voice state, and host controls carried over from the current member list.
+
+**Acceptance criteria:**
+- Room view is a full-page top-down pill-shaped table (spec: `docs/PROJECT.md` → Room table view), with seats drawn for every capacity from 2 up to the 12-member ceiling and empty chairs for unoccupied seats
+- Each seat renders a placeholder avatar behind a single avatar component, so Phase 6 swaps in real characters without touching the table layout
+- Seat assignment is server-side, global, and stable: members already seated don't move when someone joins or leaves
+- Each occupied seat shows name plate, host crown / next-host badge, speaking ring, and voice status; clicking a seat opens a popover carrying the host's "Set as Next Host" control
+- Mute state is broadcast to the room and shown on the muted member's seat
+- Chat is a toggleable semi-transparent overlay in the top-right, open by default
+- A Participants button (carrying the member count) opens a list of everyone present, with the host's "Set as Next Host" control per row
+- Per-user room-creation rate limit enforced (extends Phase 3's rate-limiting approach)
+
+## Phase 6 — Character system ⬜
 Persisted, customizable characters, rendered seated at the room's table.
 
 **Deliverable:** a user can design a character, and everyone present in a room sees each other's characters seated at the table.
@@ -71,14 +86,13 @@ Persisted, customizable characters, rendered seated at the room's table.
 - `character` context on the CRUD server persists one character per user (slots: hair, eyes, head shape, clothes, skin tone, shoes, accessories)
 - `GET /characters?user_ids=...` batch endpoint returns correct data for multiple users in one call
 - Character sprites composited from the Kenney Modular Character Pack render correctly for all seven slots
-- Room view replaces the plain member list with seated, rendered characters for everyone present
+- The room table's placeholder avatars (Phase 5) are replaced with rendered characters for everyone present
 - Character edits are reflected the next time the room is viewed/joined (no live mid-session update required for MVP)
-- Per-user room-creation rate limit enforced (extends Phase 3's rate-limiting approach)
 - Signup flow (built in Phase 1 without this step) is reworked to insert a required character-creation step — signup isn't complete until a character is designed, no skip
 - Login/signup screen background is revisited: swap the current placeholder gradient for a tiled view of rendered avatars seated in rooms, now that character/room rendering actually exists
 - Landing page's room-card thumbnails (currently an abstract gradient placeholder) are revisited: swap in an actual live/rendered preview of each room's table, now that room/character rendering actually exists
 
-## Phase 6 — Hardening & deployment ⬜
+## Phase 7 — Hardening & deployment ⬜
 Get the full stack running for real, outside localhost.
 
 **Deliverable:** the complete user flow — sign up → create character → create/join a room → chat and talk — works end-to-end on a deployed VPS.

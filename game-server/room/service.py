@@ -38,7 +38,17 @@ def _load_room(room_id: str) -> Room:
 
     order = repo.get_member_order(room_id)
     names = repo.get_member_names(room_id)
-    members = [Member(user_id=uid, username=names.get(uid, "unknown")) for uid in order]
+    seats = repo.get_seats(room_id)
+    muted = repo.get_muted(room_id)
+    members = [
+        Member(
+            user_id=uid,
+            username=names.get(uid, "unknown"),
+            seat=seats[uid],
+            muted=uid in muted,
+        )
+        for uid in order
+    ]
 
     return Room(
         id=room_id,
@@ -63,6 +73,8 @@ def create_room(*, name: str, capacity: int, host_id: str, host_username: str) -
         raise InvalidCapacityError(
             f"Capacity must be between {Config.ROOM_MIN_CAPACITY} and {Config.ROOM_MAX_CAPACITY}"
         )
+    if repo.increment_room_create_count(host_id) > Config.ROOM_CREATE_RATE_LIMIT_PER_MINUTE:
+        raise RateLimitedError(host_id)
 
     room_id = uuid.uuid4().hex
     repo.create_room(
@@ -78,11 +90,17 @@ def join_room(room_id: str, user_id: str, username: str) -> Room:
     if repo.is_member(room_id, user_id):
         return _load_room(room_id)
 
-    if repo.member_count(room_id) >= int(repo.get_room_fields(room_id)["capacity"]):
+    capacity = int(repo.get_room_fields(room_id)["capacity"])
+    if repo.member_count(room_id) >= capacity:
         raise RoomFullError(room_id)
 
-    repo.add_member(room_id, user_id, username)
+    repo.add_member(room_id, user_id, username, _lowest_free_seat(room_id, capacity))
     return _load_room(room_id)
+
+
+def _lowest_free_seat(room_id: str, capacity: int) -> int:
+    taken = set(repo.get_seats(room_id).values())
+    return next(seat for seat in range(capacity) if seat not in taken)
 
 
 def leave_room(room_id: str, user_id: str) -> Room | None:
@@ -119,6 +137,16 @@ def designate_successor(room_id: str, host_id: str, target_user_id: str) -> Room
         raise NotMemberError(target_user_id)
 
     repo.set_designated_successor(room_id, target_user_id)
+    return _load_room(room_id)
+
+
+def set_muted(room_id: str, user_id: str, muted: bool) -> Room:
+    if not repo.room_exists(room_id):
+        raise RoomNotFoundError(room_id)
+    if not repo.is_member(room_id, user_id):
+        raise NotMemberError(user_id)
+
+    repo.set_muted(room_id, user_id, muted)
     return _load_room(room_id)
 
 

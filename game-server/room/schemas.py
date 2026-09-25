@@ -25,6 +25,10 @@ class IceServer(BaseModel):
     credential: str | None = None
 
 
+class SetMutedRequest(BaseModel):
+    muted: bool
+
+
 class SignalRequest(BaseModel):
     target_user_id: str
     signal: dict
@@ -45,6 +49,8 @@ class ChatMessageResponse(BaseModel):
 class MemberResponse(BaseModel):
     user_id: str
     username: str
+    seat: int
+    muted: bool
 
 
 class RoomSummary(BaseModel):
@@ -76,5 +82,5 @@ class RoomDetail(BaseModel):
             capacity=room.capacity,
             host_id=room.host_id,
             designated_successor_id=room.designated_successor_id,
-            members=[MemberResponse(user_id=m.user_id, username=m.username) for m in room.members],
+            members=[MemberResponse(**asdict(m)) for m in room.members],
         )

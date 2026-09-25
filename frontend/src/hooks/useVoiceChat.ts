@@ -32,7 +32,7 @@ export function useVoiceChat({
   const [micError, setMicError] = useState<string | null>(null);
   const [peerStates, setPeerStates] = useState<Record<string, RTCPeerConnectionState>>({});
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  const [micReady, setMicReady] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
@@ -48,7 +48,7 @@ export function useVoiceChat({
           return;
         }
         localStreamRef.current = stream;
-        setMicReady(true);
+        setLocalStream(stream);
       })
       .catch(() => {
         setMicError('Microphone unavailable — you can hear others, but they cannot hear you.');
@@ -168,7 +168,7 @@ export function useVoiceChat({
     .join(',');
 
   useEffect(() => {
-    if (!socket || !iceServers || !micReady) return;
+    if (!socket || !iceServers || !localStream) return;
 
     const peerIds = peerIdsKey ? peerIdsKey.split(',') : [];
 
@@ -191,7 +191,7 @@ export function useVoiceChat({
     for (const peerId of [...peersRef.current.keys()]) {
       if (!peerIds.includes(peerId)) closePeer(peerId);
     }
-  }, [peerIdsKey, socket, iceServers, micReady, userId, createPeer, closePeer, emitSignal]);
+  }, [peerIdsKey, socket, iceServers, localStream, userId, createPeer, closePeer, emitSignal]);
 
   useEffect(() => {
     const peers = peersRef.current;
@@ -212,5 +212,5 @@ export function useVoiceChat({
     setMicEnabled(next);
   }, [micEnabled]);
 
-  return { micEnabled, toggleMic, micError, peerStates, remoteStreams };
+  return { micEnabled, toggleMic, micError, peerStates, remoteStreams, localStream };
 }

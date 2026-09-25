@@ -57,6 +57,8 @@ def create():
         )
     except service.InvalidCapacityError as exc:
         return jsonify(error=str(exc)), 400
+    except service.RateLimitedError:
+        return jsonify(error="You're creating rooms too quickly — try again in a minute"), 429
 
     return jsonify(RoomDetail.from_room(room).model_dump()), 201
 

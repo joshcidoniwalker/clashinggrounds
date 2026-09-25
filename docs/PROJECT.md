@@ -63,10 +63,21 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - Each user has exactly one persisted character, owned by the CRUD server/Postgres. Creating a character is a required step of signup — an account isn't complete until a character is designed (no skip, no default-assigned character). Editable anytime afterward from settings.
 - Customization is preset-based for MVP: the user picks one option per slot from a fixed set of choices per slot — no freeform color/shape editing. Slots: hair, eyes, head shape, clothes, skin tone, shoes, accessories. Exact preset count per slot is determined by what the chosen asset pack provides.
 - Rendered as 2D layered sprites: each slot is an image layer, composited together (CSS/Canvas) into the final character.
-- Art source: **Kenney Modular Character Pack** (CC0 / public domain, free for commercial use, no attribution required) — ~425 sprites covering swappable heads/hair/torsos/pants/shoes/accessories, purpose-built for this kind of layering.
+- Art source: **undecided** — originally the Kenney Modular Character Pack, but that's full-body and front-facing, which doesn't suit the top-down room table (see Room table view). The chosen pack needs top-down, bust, or portrait art that reads well inside a circular seat. Several packs may be trialled in Phase 6.
 - In a room, each member's character is rendered seated at a shared table alongside the other members present.
 - The game server never handles character data — it only broadcasts which user IDs are in a room; each client fetches those users' character data from the CRUD server to render them.
 - **Batch fetch:** the CRUD server exposes `GET /characters?user_ids=1,2,3` returning an array of character data for the requested users in one call, so rendering an N-member room doesn't require N separate requests per client.
+
+**Room table view**
+- Top-down, pill-shaped table (straight sides, rounded ends) sized to roughly 80% of the screen width and 56% of its height, with seats sitting on its rim. Seats are drawn for the room's full capacity; unoccupied seats render as empty chairs, so the layout never shifts as people join or leave.
+- Seat order is global and stable: the game server assigns each member the lowest free seat index at join time (Redis hash `user_id → seat`), and a member keeps that seat until they leave. Each client then rotates the table so the viewer's own seat is always drawn at bottom centre — everyone sees themselves in the same chair, while the order around the table (who sits beside whom) is the same for all viewers.
+- Each occupied seat shows: the avatar (placeholder colored-initial circle until Phase 6), a name plate, a host crown / next-host badge, a speaking ring driven by local voice-activity detection on each audio stream, and a voice status indicator (muted / connecting / failed).
+- Mute state is broadcast: toggling the mic tells the game server, which includes each member's mute state in `room_updated`.
+- Clicking an occupied seat opens a popover with that member's details; for the host, it carries "Set as Next Host".
+- A Participants button (people icon + `present/capacity` count — the only place the member count appears) opens a list of everyone in the room: avatar, name, Host / Next Host tag, voice status, and "Set as Next Host" per row for the host. It overlays the chat in the same top-right slot.
+- Chat is a semi-transparent black overlay with white text over the table, open by default, with a show/hide toggle.
+- The room view has no site top bar (logo / username / Log Out) — the table page is the whole screen, and leaving the room returns to pages that have it. A header floats over the top of the table: Leave Room at top left, the room name centred (Manrope; truncated with an ellipsis past ~440px, full name in a tooltip on hover or focus), and Participants, Mute and Show/Hide Chat at top right. The chat overlay sits top right, beneath those buttons.
+- The table's centre carries the Clashing Grounds logo and wordmark.
 
 ## Conventions & Workflow
 

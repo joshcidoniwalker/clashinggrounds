@@ -5,6 +5,8 @@ const GAME_API_URL = process.env.NEXT_PUBLIC_GAME_API_URL ?? 'http://localhost:5
 export type Member = {
   user_id: string;
   username: string;
+  seat: number;
+  muted: boolean;
 };
 
 export type RoomSummary = {
