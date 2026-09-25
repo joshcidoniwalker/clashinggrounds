@@ -44,7 +44,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - If no members remain when the host disconnects, the room is torn down immediately and its Redis state is deleted.
 
 **Room browsing**
-- All rooms are public-listed for MVP — any logged-in user can browse and join any room (up to its capacity). No invite-only rooms yet (revisit later if needed).
+- All rooms are public-listed for MVP — anyone, logged in or not, can see the open rooms (name and member count only, never who's in them), and any logged-in user can join one up to its capacity. The public listing is what the landing page's "Explore rooms" grid shows. No invite-only rooms yet (revisit later if needed).
 
 **Text chat: format & delivery**
 - Messages are JSON events over the Socket.IO channel: `{room_id, sender_id, body, sent_at}`.
@@ -74,7 +74,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - Each occupied seat shows: the avatar (placeholder colored-initial circle until Phase 6), a name plate, a host crown / next-host badge, a speaking ring driven by local voice-activity detection on each audio stream, and a voice status indicator (muted / connecting / failed).
 - Mute state is broadcast: toggling the mic tells the game server, which includes each member's mute state in `room_updated`.
 - Clicking an occupied seat opens a popover with that member's details; for the host, it carries "Set as Next Host".
-- A Participants button (people icon + `present/capacity` count — the only place the member count appears) opens a list of everyone in the room: avatar, name, Host / Next Host tag, voice status, and "Set as Next Host" per row for the host. It overlays the chat in the same top-right slot.
+- A Participants button (people icon + `present/capacity` count — the only place the member count appears) opens a list of everyone in the room: avatar, name, Host / Next Host tag, voice status, and "Set as Next Host" per row for the host. It shares the top-right slot with chat — opening either one closes the other.
 - Chat is a semi-transparent black overlay with white text over the table, open by default, with a show/hide toggle.
 - The room view has no site top bar (logo / username / Log Out) — the table page is the whole screen, and leaving the room returns to pages that have it. A header floats over the top of the table: Leave Room at top left, the room name centred (Manrope; truncated with an ellipsis past ~440px, full name in a tooltip on hover or focus), and Participants, Mute and Show/Hide Chat at top right. The chat overlay sits top right, beneath those buttons.
 - The table's centre carries the Clashing Grounds logo and wordmark.

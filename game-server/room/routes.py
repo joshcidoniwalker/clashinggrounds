@@ -33,8 +33,9 @@ def ice_servers():
     return jsonify([s.model_dump(exclude_none=True) for s in servers])
 
 
+# Public so the landing page can show logged-out visitors what's open. A
+# summary carries no member identities; joining still requires a token.
 @room_bp.get("")
-@require_auth
 def browse():
     rooms = service.browse_rooms()
     return jsonify([RoomSummary.from_room(r).model_dump() for r in rooms])

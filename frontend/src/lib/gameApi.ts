@@ -33,12 +33,16 @@ export type RoomDetail = {
   members: Member[];
 };
 
-async function request<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  token: string | null,
+  options: RequestInit = {},
+): Promise<T> {
   const response = await fetch(`${GAME_API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(token && { Authorization: `Bearer ${token}` }),
     },
   });
 
@@ -49,8 +53,8 @@ async function request<T>(path: string, token: string, options: RequestInit = {}
   return data as T;
 }
 
-export function browseRooms(token: string) {
-  return request<RoomSummary[]>('/rooms', token);
+export function browseRooms() {
+  return request<RoomSummary[]>('/rooms', null);
 }
 
 export function createRoom(token: string, name: string, capacity: number) {

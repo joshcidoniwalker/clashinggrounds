@@ -21,12 +21,12 @@ export default function RoomsPage() {
 
   useEffect(() => {
     if (!user) return;
-    browseRooms(user.token).then(setRooms);
+    browseRooms().then(setRooms);
   }, [user]);
 
   function handleLogout() {
     clearToken();
-    router.push('/login');
+    router.push('/');
   }
 
   async function handleCreate(name: string, capacity: number) {
