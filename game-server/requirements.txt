@@ -4,6 +4,7 @@ flask-socketio>=5.3
 pydantic>=2
 gevent>=24.2
 gevent-websocket>=0.10
+httpx>=0.27
 redis>=5.0
 pyjwt>=2.8
 python-dotenv>=1.0

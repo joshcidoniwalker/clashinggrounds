@@ -9,9 +9,15 @@ export type Member = {
   muted: boolean;
 };
 
+export type Category = {
+  slug: string;
+  name: string;
+};
+
 export type RoomSummary = {
   id: string;
   name: string;
+  category: Category;
   capacity: number;
   member_count: number;
 };
@@ -27,6 +33,7 @@ export type ChatMessage = {
 export type RoomDetail = {
   id: string;
   name: string;
+  category: Category;
   capacity: number;
   host_id: string;
   designated_successor_id: string | null;
@@ -53,14 +60,15 @@ async function request<T>(
   return data as T;
 }
 
-export function browseRooms() {
-  return request<RoomSummary[]>('/rooms', null);
+export function browseRooms(category: string | null = null) {
+  const query = category ? `?category=${encodeURIComponent(category)}` : '';
+  return request<RoomSummary[]>(`/rooms${query}`, null);
 }
 
-export function createRoom(token: string, name: string, capacity: number) {
+export function createRoom(token: string, name: string, category: string, capacity: number) {
   return request<RoomDetail>('/rooms', token, {
     method: 'POST',
-    body: JSON.stringify({ name, capacity }),
+    body: JSON.stringify({ name, category, capacity }),
   });
 }
 

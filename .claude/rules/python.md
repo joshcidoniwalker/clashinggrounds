@@ -16,6 +16,6 @@ paths:
 
 Organize each service by bounded context/domain, not by technical layer (no top-level `models/`, `routes/`, `services/`). Use entities and repositories where they add clarity; skip heavier tactical patterns (aggregates, domain events, CQRS) unless a specific problem calls for them.
 
-- **crud-server** contexts: `identity` (accounts, auth, JWT issuance), `character` (avatar customization, persisted character data).
+- **crud-server** contexts: `identity` (accounts, auth, JWT issuance), `room_category` (curated room categories), `character` (avatar customization, persisted character data).
 - **game-server** context: `room` (room lifecycle, presence, text chat, WebRTC signaling — one context for now, tightly coupled around a room's lifetime).
 - Shape per context: `<context>/{models.py, repository.py, service.py, routes.py}`.

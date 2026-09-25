@@ -1,3 +1,4 @@
+import { CategoryPill } from '@/components/CategoryPill';
 import { PeopleIcon } from '@/components/icons';
 import type { RoomSummary } from '@/lib/gameApi';
 
@@ -17,6 +18,7 @@ export function RoomCard({
       <div className="aspect-[16/10] w-full rounded-[14px] bg-[radial-gradient(120%_140%_at_30%_20%,rgba(47,214,117,0.22),rgba(20,20,24,0.95)_65%)]" />
       <div className="mt-3 flex items-end justify-between gap-2.5">
         <div className="flex flex-col gap-1">
+          <CategoryPill name={room.category.name} />
           <span className="text-base font-bold text-foreground">{room.name}</span>
           <div className="flex items-center gap-1.5">
             <PeopleIcon />

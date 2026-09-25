@@ -34,16 +34,18 @@ Full requirements, architecture decisions, and design specs: `docs/PROJECT.md`. 
 
 ### Cross-service auth
 
-`crud-server` issues JWTs (HS256) on signup/login. `game-server` verifies them locally against the same `JWT_SECRET` env var (`game-server/auth.py`: `verify_token`, `require_auth`) — it never calls back to `crud-server`. Both services must be configured with matching secrets.
+`crud-server` issues JWTs (HS256) on signup/login. `game-server` verifies them locally against the same `JWT_SECRET` env var (`game-server/auth.py`: `verify_token`, `require_auth`) — it never calls back to `crud-server` for auth. Both services must be configured with matching secrets.
+
+The one runtime call from `game-server` to `crud-server` is room creation: `POST /rooms` fetches `GET /room-categories` (`game-server/room/category_client.py`, `Config.CRUD_SERVER_URL`, 3s timeout) on every request, uncached, to validate the chosen category. If that fails, room creation returns 503; nothing else depends on it. `app.py` applies gevent monkey-patching first thing so this blocking call doesn't stall every other request and socket event.
 
 ### Bounded contexts
 
-- `crud-server`: `identity` (accounts, auth, JWT issuance — implemented) and `character` (avatar customization — scaffolded only, Phase 6).
+- `crud-server`: `identity` (accounts, auth, JWT issuance — implemented), `room_category` (the curated list of room categories, public `GET /room-categories`; changed only through Alembic data migrations — spec: `docs/ROOM_CATEGORIES.md`) and `character` (avatar customization — scaffolded only, Phase 6).
 - `game-server`: `room` (room lifecycle + presence now; will also carry chat and WebRTC signaling in later phases).
 
 ### Redis schema (`game-server/room/repository.py`)
 
-- `room:{id}` — hash: `name`, `capacity`, `host_id`, `designated_successor_id`, `created_at`
+- `room:{id}` — hash: `name`, `category_slug`, `category_name`, `capacity`, `host_id`, `designated_successor_id`, `created_at`. The category name is captured at creation, so a later rename or retirement doesn't affect live rooms
 - `room:{id}:member_order` — sorted set, `user_id → join timestamp` (oldest = longest-tenured; used as the host-handoff fallback)
 - `room:{id}:member_names` — hash, `user_id → username`
 - `room:{id}:seats` — hash, `user_id → seat index`; a joiner gets the lowest free index and keeps it until they leave, so seating never shuffles

@@ -5,6 +5,10 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# gevent monkey-patching has to run before the other imports.
+"app.py" = ["E402"]
+
 [tool.black]
 target-version = ["py312"]
 line-length = 100

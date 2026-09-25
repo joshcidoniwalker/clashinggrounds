@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { CategoryFilter } from '@/components/CategoryFilter';
+import { CategoryPill } from '@/components/CategoryPill';
 import { PeopleIcon } from '@/components/icons';
+import { useRoomCategories } from '@/hooks/useRoomCategories';
 import { browseRooms, type RoomSummary } from '@/lib/gameApi';
 
 const THUMBNAIL =
@@ -34,6 +37,7 @@ function RoomTile({ room }: { room: RoomSummary }) {
         </Link>
       )}
       <div className="mt-3 flex flex-col gap-1.5">
+        <CategoryPill name={room.category.name} />
         <span className="truncate text-base font-semibold text-foreground">{room.name}</span>
         <div className="flex items-center gap-1.5">
           <PeopleIcon size={14} />
@@ -46,24 +50,11 @@ function RoomTile({ room }: { room: RoomSummary }) {
   );
 }
 
-export function ExploreRooms() {
-  const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    browseRooms()
-      .then(setRooms)
-      .catch(() => setFailed(true));
-  }, []);
-
-  if (failed) {
-    return <p className="text-sm text-[#6E6E78]">Rooms couldn’t be loaded right now.</p>;
-  }
-  if (!rooms) return null;
+function RoomGrid({ rooms, filterName }: { rooms: RoomSummary[]; filterName?: string }) {
   if (rooms.length === 0) {
     return (
       <p className="text-sm text-[#9A9AA5]">
-        No rooms are open right now.{' '}
+        {filterName ? `No ${filterName} rooms are open right now.` : 'No rooms are open right now.'}{' '}
         <Link href="/signup" className="font-extrabold text-accent hover:text-[#58E497]">
           Sign up and start one.
         </Link>
@@ -77,5 +68,42 @@ export function ExploreRooms() {
         <RoomTile key={room.id} room={room} />
       ))}
     </div>
+  );
+}
+
+export function ExploreRooms() {
+  const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const { categories } = useRoomCategories();
+  const [filter, setFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Switching filters quickly can land responses out of order; only the
+    // latest filter's response may update the list.
+    let stale = false;
+    browseRooms(filter)
+      .then((result) => {
+        if (!stale) setRooms(result);
+      })
+      .catch(() => {
+        if (!stale) setFailed(true);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [filter]);
+
+  if (failed) {
+    return <p className="text-sm text-[#6E6E78]">Rooms couldn’t be loaded right now.</p>;
+  }
+  if (!rooms) return null;
+
+  return (
+    <>
+      {categories && (
+        <CategoryFilter categories={categories} selected={filter} onSelect={setFilter} />
+      )}
+      <RoomGrid rooms={rooms} filterName={categories?.find((c) => c.slug === filter)?.name} />
+    </>
   );
 }

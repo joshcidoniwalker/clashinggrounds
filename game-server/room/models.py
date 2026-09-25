@@ -19,9 +19,16 @@ class ChatMessage:
 
 
 @dataclass
+class Category:
+    slug: str
+    name: str
+
+
+@dataclass
 class Room:
     id: str
     name: str
+    category: Category
     capacity: int
     host_id: str
     designated_successor_id: str | None

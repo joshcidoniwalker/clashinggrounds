@@ -26,7 +26,7 @@ Web platform for creating and joining chatrooms with real-time voice and text ch
 ## Architecture
 Two independently deployable backend services, plus the frontend:
 
-1. **CRUD server** (Flask + Postgres) — accounts, auth, JWT issuance, and character data (one persisted character per user). No knowledge of rooms or voice.
+1. **CRUD server** (Flask + Postgres) — accounts, auth, JWT issuance, character data (one persisted character per user), and the curated list of room categories. No knowledge of rooms or voice.
 2. **Game server** (Flask + Flask-SocketIO + Redis) — room lifecycle, presence, text chat, WebRTC signaling. Exposes REST endpoints for room browse/create/join/leave, plus a WebSocket channel for realtime events (chat messages, signaling, presence). Verifies JWTs issued by the CRUD server independently. Has no knowledge of character appearance data — it only broadcasts member user IDs.
 
 Next.js frontend calls the CRUD server (REST) for auth/account/character data, and the game server (REST + WebSocket) for everything room-related. When rendering a room, the frontend gets the member user IDs from the game server and fetches their character appearance data directly from the CRUD server.
@@ -36,7 +36,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 ## Design specs / Core mechanics
 
 **Room creation & host designation**
-- The creator becomes the room's host and sets: room name and capacity (configurable per room, up to a hard ceiling of **12** members — P2P mesh connection count grows as N·(N-1)/2, so 12 means up to 66 simultaneous connections at full capacity). All rooms are public-listed for MVP — see Room browsing.
+- The creator becomes the room's host and sets: room name, category (one of a curated list, Just Chatting preselected; fixed once created — see `docs/ROOM_CATEGORIES.md`), and capacity (configurable per room, up to a hard ceiling of **12** members — P2P mesh connection count grows as N·(N-1)/2, so 12 means up to 66 simultaneous connections at full capacity). All rooms are public-listed for MVP — see Room browsing.
 
 **Host disconnect & handoff**
 - A host may designate a successor (explicit host queue) at any time while hosting.
@@ -44,7 +44,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - If no members remain when the host disconnects, the room is torn down immediately and its Redis state is deleted.
 
 **Room browsing**
-- All rooms are public-listed for MVP — anyone, logged in or not, can see the open rooms (name and member count only, never who's in them), and any logged-in user can join one up to its capacity. The public listing is what the landing page's "Explore rooms" grid shows. No invite-only rooms yet (revisit later if needed).
+- All rooms are public-listed for MVP — anyone, logged in or not, can see the open rooms (name, category, and member count only, never who's in them), and any logged-in user can join one up to its capacity. The public listing is what the landing page's "Explore rooms" grid shows. Both it and the logged-in room browser can be filtered by category. No invite-only rooms yet (revisit later if needed).
 
 **Text chat: format & delivery**
 - Messages are JSON events over the Socket.IO channel: `{room_id, sender_id, body, sent_at}`.
@@ -83,7 +83,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 
 - **Repo layout:** monorepo — `/frontend` (Next.js), `/crud-server` (Flask + Postgres), `/game-server` (Flask-SocketIO + Redis).
 - **Code architecture — light DDD:** each backend service is organized by bounded context/domain (not by technical layer like `models/`, `routes/`, `services/` at the top level). Entities and repositories are used where they add clarity; heavier tactical patterns (aggregates, domain events, CQRS) are only introduced if a specific problem calls for them — not applied by default.
-  - **CRUD server** bounded contexts: `identity` (accounts, auth, JWT issuance) and `character` (avatar customization, persisted character data).
+  - **CRUD server** bounded contexts: `identity` (accounts, auth, JWT issuance), `room_category` (curated room categories), and `character` (avatar customization, persisted character data).
   - **Game server** bounded context: `room` (room lifecycle, presence, text chat, WebRTC signaling — kept as one context for now since these are tightly coupled around a single room's lifetime).
   - Example shape per context: `crud-server/identity/{models.py, repository.py, service.py, routes.py}`, mirrored for `character`; `game-server/room/{...}` likewise.
 - **Python conventions:** full type hints on all functions/methods; Pydantic v2 idioms (`model_validate`, `ConfigDict`, etc.) at API/serialization boundaries; plain dataclasses or attrs for internal domain entities rather than Pydantic (fits the light-DDD split between domain and boundary layers).
