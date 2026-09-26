@@ -27,6 +27,7 @@ Full requirements, architecture decisions, and design specs: `docs/PROJECT.md`. 
 ### Full stack
 
 - `docker compose up -d --build` — all five containers (frontend :3000, crud-server :5001, game-server :5002, postgres :5433→5432, redis :6380→6379, coturn on host network). Host ports for postgres/redis are remapped because 5432/6379 may already be taken locally (e.g. OrbStack).
+- Compose settings (origins, public API URLs, secrets, TURN, host ports) come from a root `.env` (gitignored); copy `.env.example` to start. Every variable has a default in `docker-compose.yml`, so it also runs without one.
 - `docker compose exec crud-server python -m alembic upgrade head` — run migrations against the running container.
 - **Gotcha:** adding an npm dependency doesn't reach a running frontend container on its own — the anonymous `node_modules` volume survives a plain rebuild. Run `docker compose up -d --force-recreate --renew-anon-volumes frontend` after `npm install`ing something new.
 
