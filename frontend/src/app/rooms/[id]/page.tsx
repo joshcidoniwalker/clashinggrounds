@@ -243,10 +243,12 @@ export default function RoomViewPage() {
         seats={speakers}
         selectedId={selectedId}
         canManage={isHost}
+        micEnabled={micEnabled}
         onSelect={(userId) => setSelectedId((current) => (current === userId ? null : userId))}
         onDismiss={dismissOverlays}
         onMakeHost={handleMakeHost}
         onMoveToAudience={handleMoveToAudience}
+        onToggleMic={toggleMic}
       />
 
       <RoomHeader
@@ -254,13 +256,10 @@ export default function RoomViewPage() {
         isSpeaker={isSpeaker}
         isHost={isHost}
         tableFull={speakers.length >= room.capacity}
-        micEnabled={micEnabled}
         chatOpen={sidePanel === 'chat'}
         participantsOpen={sidePanel === 'participants'}
         onLeave={handleLeave}
-        onLeaveTable={() => handleMoveToAudience(user.userId)}
         onTakeSeat={() => handleAddToTable(user.userId)}
-        onToggleMic={toggleMic}
         onToggleChat={() => togglePanel('chat')}
         onToggleParticipants={() => togglePanel('participants')}
       />

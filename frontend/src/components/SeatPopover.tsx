@@ -16,15 +16,19 @@ export function SeatPopover({
   point,
   stage,
   canManage,
+  micEnabled,
   onMakeHost,
   onMoveToAudience,
+  onToggleMic,
 }: {
   view: SeatView;
   point: SeatPoint;
   stage: { width: number; height: number };
   canManage: boolean;
+  micEnabled: boolean;
   onMakeHost: () => void;
   onMoveToAudience: () => void;
+  onToggleMic: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -87,7 +91,30 @@ export function SeatPopover({
           <RowAction label="Move to audience" onClick={onMoveToAudience} />
         </div>
       )}
-      {isSelf && <RowAction label="Leave table" onClick={onMoveToAudience} />}
+      {isSelf && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onToggleMic}
+            disabled={voice === 'noMic'}
+            aria-pressed={!micEnabled}
+            className={`cursor-pointer rounded-full border px-3.5 py-2 text-[13px] font-extrabold disabled:cursor-default disabled:opacity-40 ${
+              micEnabled
+                ? 'border-white/20 text-foreground'
+                : 'border-[#FF3B30] bg-[#FF3B30] text-white'
+            }`}
+          >
+            {micEnabled ? 'Mute' : 'Unmute'}
+          </button>
+          <button
+            type="button"
+            onClick={onMoveToAudience}
+            className="cursor-pointer rounded-full border border-[#FF3B30] px-3.5 py-2 text-[13px] font-extrabold text-[#FF3B30]"
+          >
+            Leave table
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,20 +25,24 @@ export function RoomTable({
   seats,
   selectedId,
   canManage,
+  micEnabled,
   onSelect,
   onDismiss,
   onMakeHost,
   onMoveToAudience,
+  onToggleMic,
 }: {
   capacity: number;
   viewerSeat: number;
   seats: SeatedView[];
   selectedId: string | null;
   canManage: boolean;
+  micEnabled: boolean;
   onSelect: (userId: string) => void;
   onDismiss: () => void;
   onMakeHost: (userId: string) => void;
   onMoveToAudience: (userId: string) => void;
+  onToggleMic: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const size = useElementSize(ref);
@@ -84,8 +88,10 @@ export function RoomTable({
               point={layout.seats[positionOfSeat(selected.member.seat, viewerSeat, capacity)]}
               stage={size}
               canManage={canManage}
+              micEnabled={micEnabled}
               onMakeHost={() => onMakeHost(selected.member.user_id)}
               onMoveToAudience={() => onMoveToAudience(selected.member.user_id)}
+              onToggleMic={onToggleMic}
             />
           )}
         </>

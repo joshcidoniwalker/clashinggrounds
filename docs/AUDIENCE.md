@@ -95,8 +95,7 @@ The P2P mesh stays. Which pairs connect, and in which direction, now depends on 
 ### Room header
 
 - The Participants button reads **people icon + "Participants"**, with no count.
-- **Mute** is shown only to speakers. Audience members see no mic control.
-- **Leave table** is a header button shown to every speaker, host included.
+- The header has no Mute or Leave table buttons; a speaker finds both in their own seat popover. Audience members have no mic control at all.
 - **Take a seat** is a header button, in the same slot, shown only to the host while in the audience.
 - Leave Room, room name, and Show/Hide Chat are unchanged for everyone.
 
@@ -107,7 +106,7 @@ The P2P mesh stays. Which pairs connect, and in which direction, now depends on 
 - Audience member's view (including a host in the audience): rotated so the **host's** seat is at bottom centre while the host is seated; when the host is in the audience, unrotated with seat 0 at bottom centre. It re-orients whenever the host changes or the host's seat changes.
 - Seat popover (clicking a seated speaker):
   - For the host, on any other speaker: **Move to audience** alongside "Set as Next Host".
-  - On your own seat: **Leave table**.
+  - On your own seat: **Mute / Unmute**, with **Leave table** below it. Mute is disabled when the mic is unavailable.
 
 ### Participants panel
 
@@ -185,7 +184,7 @@ A starting point for implementation, not settled requirements.
 - Joining any existing room succeeds and puts the joiner in the audience; no mic prompt.
 - Audience members hear all speakers, can read and send chat, and aren't drawn on the table.
 - The host can Add to table (lowest free seat, arrives unmuted) and Move to audience from both the Participants panel and the seat popover. Add to table is disabled with "No free seats" when the table is full.
-- Any speaker, host included, can Leave table from the header and from their own seat popover; the host stays host.
+- Any speaker, host included, can Mute/Unmute and Leave table from their own seat popover (neither is in the header); the host stays host.
 - A host in the audience can Take a seat from the header and from their own Audience row (lowest free seat, live), disabled when the table is full.
 - A denied mic permission on promotion leaves the user seated and muted.
 - Next Host can be set on any member and survives role changes.
