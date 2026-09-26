@@ -36,7 +36,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 ## Design specs / Core mechanics
 
 **Room creation & host designation**
-- The creator becomes the room's host and sets: room name, category (one of a curated list, Just Chatting preselected; fixed once created — see `docs/ROOM_CATEGORIES.md`), and capacity (configurable per room, up to a hard ceiling of **12** members — P2P mesh connection count grows as N·(N-1)/2, so 12 means up to 66 simultaneous connections at full capacity). All rooms are public-listed for MVP — see Room browsing.
+- The creator becomes the room's host and sets: room name, category (one of a curated list, Just Chatting preselected; fixed once created — see `docs/ROOM_CATEGORIES.md`), and capacity — the number of seats at the table, i.e. speakers; the audience is unlimited (see `docs/AUDIENCE.md`) — (configurable per room, up to a hard ceiling of **12** seats — P2P mesh connection count grows as N·(N-1)/2, so 12 means up to 66 simultaneous connections at full capacity). All rooms are public-listed for MVP — see Room browsing.
 
 **Host disconnect & handoff**
 - A host may designate a successor (explicit host queue) at any time while hosting.
@@ -44,7 +44,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - If no members remain when the host disconnects, the room is torn down immediately and its Redis state is deleted.
 
 **Room browsing**
-- All rooms are public-listed for MVP — anyone, logged in or not, can see the open rooms (name, category, and member count only, never who's in them), and any logged-in user can join one up to its capacity. The public listing is what the landing page's "Explore rooms" grid shows. Both it and the logged-in room browser can be filtered by category. No invite-only rooms yet (revisit later if needed).
+- All rooms are public-listed for MVP — anyone, logged in or not, can see the open rooms (name, category, and speaker/audience counts only, never who's in them), and any logged-in user can join one — joiners always enter the audience, so a room is never full. The public listing is what the landing page's "Explore rooms" grid shows. Both it and the logged-in room browser can be filtered by category. No invite-only rooms yet (revisit later if needed).
 
 **Text chat: format & delivery**
 - Messages are JSON events over the Socket.IO channel: `{room_id, sender_id, body, sent_at}`.
@@ -52,7 +52,7 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 - Nothing is persisted beyond the room's lifetime — when the room is torn down, its chat buffer is deleted along with the rest of its Redis state.
 
 **WebRTC signaling flow**
-- Mesh topology: each member connects directly (P2P) to every other member in the room.
+- Mesh topology: each speaker connects directly (P2P) to every other member in the room — two-way with other speakers, send-only to the audience. Audience members don't connect to each other. Large audiences will strain speakers' upload; an SFU is the long-term fix.
 - Offer/answer SDP and ICE candidates are relayed peer-to-peer through the game server's Socket.IO channel (the server never touches media, only signaling messages).
 - coturn (self-hosted) is the TURN fallback when direct P2P connection fails (symmetric NAT, restrictive firewalls, etc.).
 
@@ -70,13 +70,13 @@ Next.js frontend calls the CRUD server (REST) for auth/account/character data, a
 
 **Room table view**
 - Top-down, pill-shaped table (straight sides, rounded ends) sized to roughly 80% of the screen width and 56% of its height, with seats sitting on its rim. Seats are drawn for the room's full capacity; unoccupied seats render as empty chairs, so the layout never shifts as people join or leave.
-- Seat order is global and stable: the game server assigns each member the lowest free seat index at join time (Redis hash `user_id → seat`), and a member keeps that seat until they leave. Each client then rotates the table so the viewer's own seat is always drawn at bottom centre — everyone sees themselves in the same chair, while the order around the table (who sits beside whom) is the same for all viewers.
+- Only speakers sit at the table; the audience isn't drawn (see `docs/AUDIENCE.md`). Seat order is global and stable: the game server assigns a speaker the lowest free seat index when they're added to the table (Redis hash `user_id → seat`), and they keep that seat until they leave the table. Each client then rotates the table so the viewer's own seat is always drawn at bottom centre (audience members see the host's seat there, or seat 0) — everyone sees themselves in the same chair, while the order around the table (who sits beside whom) is the same for all viewers.
 - Each occupied seat shows: the avatar (placeholder colored-initial circle until Phase 6), a name plate, a host crown / next-host badge, a speaking ring driven by local voice-activity detection on each audio stream, and a voice status indicator (muted / connecting / failed).
 - Mute state is broadcast: toggling the mic tells the game server, which includes each member's mute state in `room_updated`.
-- Clicking an occupied seat opens a popover with that member's details; for the host, it carries "Set as Next Host".
-- A Participants button (people icon + `present/capacity` count — the only place the member count appears) opens a list of everyone in the room: avatar, name, Host / Next Host tag, voice status, and "Set as Next Host" per row for the host. It shares the top-right slot with chat — opening either one closes the other.
+- Clicking an occupied seat opens a popover with that member's details; for the host, it carries "Set as Next Host" and "Move to audience"; on your own seat, Mute/Unmute and "Leave table".
+- A Participants button (people icon + "Participants") opens a list of everyone in the room in two sections, "Speakers n/capacity" and "Audience n", with the host's controls per row (Set as Next Host, Move to audience, Add to table / Take a seat). It shares the top-right slot with chat — opening either one closes the other.
 - Chat is a semi-transparent black overlay with white text over the table, open by default, with a show/hide toggle.
-- The room view has no site top bar (logo / username / Log Out) — the table page is the whole screen, and leaving the room returns to pages that have it. A header floats over the top of the table: Leave Room at top left, the room name centred (Manrope; truncated with an ellipsis past ~440px, full name in a tooltip on hover or focus), and Participants, Mute and Show/Hide Chat at top right. The chat overlay sits top right, beneath those buttons.
+- The room view has no site top bar (logo / username / Log Out) — the table page is the whole screen, and leaving the room returns to pages that have it. A header floats over the top of the table: Leave Room at top left, the room name centred (Manrope; truncated with an ellipsis past ~440px, full name in a tooltip on hover or focus), and Participants and Show/Hide Chat at top right (plus Take a seat for a host in the audience). Mute lives in your own seat's popover. The chat overlay sits top right, beneath those buttons.
 - The table's centre carries the Clashing Grounds logo and wordmark.
 
 ## Conventions & Workflow

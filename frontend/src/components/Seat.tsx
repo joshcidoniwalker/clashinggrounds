@@ -13,9 +13,16 @@ export type SeatView = {
   speaking: boolean;
 };
 
+export type SeatedView = SeatView & { member: Member & { seat: number } };
+
+export function isSeated(view: SeatView): view is SeatedView {
+  return view.member.seat !== null;
+}
+
 function VoiceBadge({ voice }: { voice: SeatVoice }) {
   if (
     voice !== 'muted' &&
+    voice !== 'noMic' &&
     voice !== 'failed' &&
     voice !== 'connecting' &&
     voice !== 'reconnecting'
@@ -25,7 +32,7 @@ function VoiceBadge({ voice }: { voice: SeatVoice }) {
 
   return (
     <span className="pointer-events-none absolute -right-1 -bottom-1 flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-background bg-[#0B0B0E]">
-      {voice === 'muted' && <MicOffIcon className="h-3 w-3" />}
+      {(voice === 'muted' || voice === 'noMic') && <MicOffIcon className="h-3 w-3" />}
       {voice === 'failed' && <AlertIcon className="h-3 w-3" />}
       {(voice === 'connecting' || voice === 'reconnecting') &&
         [0, 200, 400].map((delay) => (
@@ -45,7 +52,7 @@ export function Seat({
   selected,
   onSelect,
 }: {
-  view: SeatView;
+  view: SeatedView;
   point: SeatPoint;
   selected: boolean;
   onSelect: () => void;

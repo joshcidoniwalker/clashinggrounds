@@ -7,6 +7,7 @@ from config import Config
 from room.broadcast import broadcast_room_state
 from room.category_client import CategoriesUnavailableError
 from room.schemas import (
+    AddSpeakerRequest,
     CreateRoomRequest,
     DesignateSuccessorRequest,
     IceServer,
@@ -88,8 +89,6 @@ def join(room_id: str):
         room = service.join_room(room_id, g.user["sub"], g.user["username"])
     except service.RoomNotFoundError:
         return jsonify(error="Room not found"), 404
-    except service.RoomFullError:
-        return jsonify(error="Room is full"), 409
 
     return jsonify(RoomDetail.from_room(room).model_dump())
 
@@ -124,6 +123,49 @@ def designate_successor(room_id: str):
         return jsonify(error="Only the host can designate a successor"), 403
     except service.NotMemberError:
         return jsonify(error="Target user is not a member of this room"), 400
+
+    broadcast_room_state(room_id, room)
+    return jsonify(RoomDetail.from_room(room).model_dump())
+
+
+@room_bp.post("/<room_id>/speakers")
+@require_auth
+def add_speaker(room_id: str):
+    try:
+        body = AddSpeakerRequest.model_validate(request.get_json(force=True))
+    except ValidationError as exc:
+        return jsonify(error=exc.errors()), 400
+
+    try:
+        room = service.add_speaker(room_id, g.user["sub"], body.user_id)
+    except service.RoomNotFoundError:
+        return jsonify(error="Room not found"), 404
+    except service.NotHostError:
+        return jsonify(error="Only the host can add people to the table"), 403
+    except service.NotMemberError:
+        return jsonify(error="Target user is not a member of this room"), 400
+    except service.AlreadySpeakerError:
+        return jsonify(error="Target user is already at the table"), 400
+    except service.NoFreeSeatError:
+        return jsonify(error="No free seats"), 409
+
+    broadcast_room_state(room_id, room)
+    return jsonify(RoomDetail.from_room(room).model_dump())
+
+
+@room_bp.delete("/<room_id>/speakers/<user_id>")
+@require_auth
+def move_to_audience(room_id: str, user_id: str):
+    try:
+        room = service.move_to_audience(room_id, g.user["sub"], user_id)
+    except service.RoomNotFoundError:
+        return jsonify(error="Room not found"), 404
+    except service.NotHostError:
+        return jsonify(error="Only the host can move others to the audience"), 403
+    except service.NotMemberError:
+        return jsonify(error="Target user is not a member of this room"), 400
+    except service.NotSpeakerError:
+        return jsonify(error="Target user is not at the table"), 400
 
     broadcast_room_state(room_id, room)
     return jsonify(RoomDetail.from_room(room).model_dump())

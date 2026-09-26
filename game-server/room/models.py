@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class Member:
     user_id: str
     username: str
-    seat: int
+    seat: int | None
     muted: bool
 
 
@@ -35,5 +35,9 @@ class Room:
     members: list[Member]
 
     @property
-    def member_count(self) -> int:
-        return len(self.members)
+    def speaker_count(self) -> int:
+        return sum(1 for m in self.members if m.seat is not None)
+
+    @property
+    def audience_count(self) -> int:
+        return len(self.members) - self.speaker_count

@@ -16,6 +16,10 @@ class DesignateSuccessorRequest(BaseModel):
     user_id: str
 
 
+class AddSpeakerRequest(BaseModel):
+    user_id: str
+
+
 class SendMessageRequest(BaseModel):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
@@ -50,7 +54,7 @@ class ChatMessageResponse(BaseModel):
 class MemberResponse(BaseModel):
     user_id: str
     username: str
-    seat: int
+    seat: int | None
     muted: bool
 
 
@@ -64,7 +68,8 @@ class RoomSummary(BaseModel):
     name: str
     category: CategoryResponse
     capacity: int
-    member_count: int
+    speaker_count: int
+    audience_count: int
 
     @classmethod
     def from_room(cls, room: Room) -> "RoomSummary":
@@ -73,7 +78,8 @@ class RoomSummary(BaseModel):
             name=room.name,
             category=CategoryResponse(**asdict(room.category)),
             capacity=room.capacity,
-            member_count=room.member_count,
+            speaker_count=room.speaker_count,
+            audience_count=room.audience_count,
         )
 
 

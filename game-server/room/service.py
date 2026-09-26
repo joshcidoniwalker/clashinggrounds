@@ -12,7 +12,15 @@ class RoomNotFoundError(Exception):
     pass
 
 
-class RoomFullError(Exception):
+class NoFreeSeatError(Exception):
+    pass
+
+
+class NotSpeakerError(Exception):
+    pass
+
+
+class AlreadySpeakerError(Exception):
     pass
 
 
@@ -49,7 +57,7 @@ def _load_room(room_id: str) -> Room:
         Member(
             user_id=uid,
             username=names.get(uid, "unknown"),
-            seat=seats[uid],
+            seat=seats.get(uid),
             muted=uid in muted,
         )
         for uid in order
@@ -114,20 +122,42 @@ def join_room(room_id: str, user_id: str, username: str) -> Room:
     if not repo.room_exists(room_id):
         raise RoomNotFoundError(room_id)
 
-    if repo.is_member(room_id, user_id):
-        return _load_room(room_id)
-
-    capacity = int(repo.get_room_fields(room_id)["capacity"])
-    if repo.member_count(room_id) >= capacity:
-        raise RoomFullError(room_id)
-
-    repo.add_member(room_id, user_id, username, _lowest_free_seat(room_id, capacity))
+    if not repo.is_member(room_id, user_id):
+        repo.add_member(room_id, user_id, username)
     return _load_room(room_id)
 
 
-def _lowest_free_seat(room_id: str, capacity: int) -> int:
-    taken = set(repo.get_seats(room_id).values())
-    return next(seat for seat in range(capacity) if seat not in taken)
+def add_speaker(room_id: str, host_id: str, target_user_id: str) -> Room:
+    """Seats an audience member; the host targeting themselves is Take a seat."""
+    room = _load_room(room_id)
+    if room.host_id != host_id:
+        raise NotHostError(host_id)
+    target = _find_member(room, target_user_id)
+    if target.seat is not None:
+        raise AlreadySpeakerError(target_user_id)
+
+    if repo.claim_seat(room_id, target_user_id, room.capacity) is None:
+        raise NoFreeSeatError(room_id)
+    return _load_room(room_id)
+
+
+def move_to_audience(room_id: str, actor_id: str, target_user_id: str) -> Room:
+    """The host can unseat any speaker; anyone else can only unseat themselves."""
+    room = _load_room(room_id)
+    if actor_id not in (room.host_id, target_user_id):
+        raise NotHostError(actor_id)
+    if _find_member(room, target_user_id).seat is None:
+        raise NotSpeakerError(target_user_id)
+
+    repo.release_seat(room_id, target_user_id)
+    return _load_room(room_id)
+
+
+def _find_member(room: Room, user_id: str) -> Member:
+    member = next((m for m in room.members if m.user_id == user_id), None)
+    if member is None:
+        raise NotMemberError(user_id)
+    return member
 
 
 def leave_room(room_id: str, user_id: str) -> Room | None:
@@ -172,6 +202,8 @@ def set_muted(room_id: str, user_id: str, muted: bool) -> Room:
         raise RoomNotFoundError(room_id)
     if not repo.is_member(room_id, user_id):
         raise NotMemberError(user_id)
+    if not repo.is_seated(room_id, user_id):
+        raise NotSpeakerError(user_id)
 
     repo.set_muted(room_id, user_id, muted)
     return _load_room(room_id)

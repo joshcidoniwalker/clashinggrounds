@@ -90,6 +90,9 @@ def register_socket_handlers(socketio: SocketIO) -> None:
         except (service.RoomNotFoundError, service.NotMemberError):
             socketio.emit("error", {"error": "Not a member of this room"}, to=request.sid)
             return
+        except service.NotSpeakerError:
+            socketio.emit("error", {"error": "Only people at the table can unmute"}, to=request.sid)
+            return
 
         broadcast_room_state(room_id, room)
 

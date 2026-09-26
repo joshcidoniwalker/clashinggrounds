@@ -6,7 +6,7 @@ import { CategoryFilter } from '@/components/CategoryFilter';
 import { CategoryPill } from '@/components/CategoryPill';
 import { PeopleIcon } from '@/components/icons';
 import { useRoomCategories } from '@/hooks/useRoomCategories';
-import { browseRooms, type RoomSummary } from '@/lib/gameApi';
+import { browseRooms, roomCountsLabel, type RoomSummary } from '@/lib/gameApi';
 
 const THUMBNAIL =
   'relative block aspect-[16/10] w-full overflow-hidden rounded-[14px] bg-[radial-gradient(120%_140%_at_30%_20%,rgba(47,214,117,0.22),rgba(20,20,24,0.95)_65%)]';
@@ -14,36 +14,22 @@ const OVERLAY =
   'absolute inset-0 flex translate-y-1.5 items-center justify-center bg-[#0A0A0C]/55 opacity-0 transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100';
 
 function RoomTile({ room }: { room: RoomSummary }) {
-  const full = room.member_count >= room.capacity;
-
   return (
     <div>
-      {full ? (
-        <div className={`group ${THUMBNAIL}`}>
-          <div className={OVERLAY}>
-            <span className="rounded-full bg-[#4A4A52] px-7.5 py-2.5 text-sm font-extrabold text-white/70">
-              Full
-            </span>
-          </div>
+      {/* Visitors have no account yet, so joining starts at signup. */}
+      <Link href="/signup" aria-label={`Join ${room.name}`} className={`group ${THUMBNAIL}`}>
+        <div className={OVERLAY}>
+          <span className="rounded-full bg-accent px-7.5 py-2.5 text-sm font-extrabold text-white">
+            Join
+          </span>
         </div>
-      ) : (
-        // Visitors have no account yet, so joining starts at signup.
-        <Link href="/signup" aria-label={`Join ${room.name}`} className={`group ${THUMBNAIL}`}>
-          <div className={OVERLAY}>
-            <span className="rounded-full bg-accent px-7.5 py-2.5 text-sm font-extrabold text-white">
-              Join
-            </span>
-          </div>
-        </Link>
-      )}
+      </Link>
       <div className="mt-3 flex flex-col gap-1.5">
         <CategoryPill name={room.category.name} />
         <span className="truncate text-base font-semibold text-foreground">{room.name}</span>
         <div className="flex items-center gap-1.5">
           <PeopleIcon size={14} />
-          <span className="text-[13px] text-[#9A9AA5] tabular-nums">
-            {room.member_count}/{room.capacity} members
-          </span>
+          <span className="text-[13px] text-[#9A9AA5] tabular-nums">{roomCountsLabel(room)}</span>
         </div>
       </div>
     </div>

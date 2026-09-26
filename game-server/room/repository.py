@@ -107,12 +107,47 @@ def create_room(
     pipe.execute()
 
 
-def add_member(room_id: str, user_id: str, username: str, seat: int) -> None:
+def add_member(room_id: str, user_id: str, username: str) -> None:
     pipe = redis_client.pipeline()
     pipe.zadd(_member_order_key(room_id), {user_id: time.time()})
     pipe.hset(_member_names_key(room_id), user_id, username)
-    pipe.hset(_seats_key(room_id), user_id, seat)
     pipe.execute()
+
+
+# Finding the lowest free seat and taking it must be one step, or two
+# simultaneous promotions could both take the last seat (or the same one).
+_CLAIM_SEAT = redis_client.register_script("""
+    if redis.call('HEXISTS', KEYS[1], ARGV[1]) == 1 then return -1 end
+    local seats = redis.call('HVALS', KEYS[1])
+    local capacity = tonumber(ARGV[2])
+    local taken = {}
+    for _, seat in ipairs(seats) do taken[tonumber(seat)] = true end
+    for seat = 0, capacity - 1 do
+        if not taken[seat] then
+            redis.call('HSET', KEYS[1], ARGV[1], seat)
+            return seat
+        end
+    end
+    return -1
+    """)
+
+
+def claim_seat(room_id: str, user_id: str, capacity: int) -> int | None:
+    """Seats the user at the lowest free index. Returns None if every seat is
+    taken or the user is already seated."""
+    seat = _CLAIM_SEAT(keys=[_seats_key(room_id)], args=[user_id, capacity])
+    return None if seat == -1 else seat
+
+
+def release_seat(room_id: str, user_id: str) -> None:
+    pipe = redis_client.pipeline()
+    pipe.hdel(_seats_key(room_id), user_id)
+    pipe.srem(_muted_key(room_id), user_id)
+    pipe.execute()
+
+
+def is_seated(room_id: str, user_id: str) -> bool:
+    return redis_client.hexists(_seats_key(room_id), user_id)
 
 
 def remove_member(room_id: str, user_id: str) -> None:

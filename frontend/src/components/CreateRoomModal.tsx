@@ -89,7 +89,7 @@ export function CreateRoomModal({
 
         <div className="flex flex-col gap-2">
           <label className="text-xs font-bold tracking-[0.6px] text-[#9A9AA5] uppercase">
-            Capacity
+            Seats
           </label>
           <div className="flex items-center gap-3.5">
             <button
