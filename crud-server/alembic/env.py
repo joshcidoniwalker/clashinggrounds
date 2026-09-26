@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import Config
 from db import Base
 from identity.models import User  # noqa: F401
+from room_category.models import RoomCategory  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

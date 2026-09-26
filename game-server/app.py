@@ -1,3 +1,10 @@
+# Must run before anything imports socket/ssl/threading; otherwise blocking I/O
+# (e.g. the crud-server call during room creation) stalls every other request
+# and socket event on the server.
+from gevent import monkey
+
+monkey.patch_all()
+
 from flask import Flask
 from flask_cors import CORS
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRoomCategories } from '@/hooks/useRoomCategories';
 
 const MIN_CAPACITY = 2;
 const MAX_CAPACITY = 12;
@@ -12,12 +13,16 @@ export function CreateRoomModal({
   error,
 }: {
   onClose: () => void;
-  onCreate: (name: string, capacity: number) => void;
+  onCreate: (name: string, category: string, capacity: number) => void;
   creating: boolean;
   error: string | null;
 }) {
   const [name, setName] = useState('');
   const [capacity, setCapacity] = useState(8);
+  const { categories, failed: categoriesFailed, retry: retryCategories } = useRoomCategories();
+  const [pickedCategory, setPickedCategory] = useState<string | null>(null);
+  const category =
+    pickedCategory ?? categories?.find((c) => c.is_default)?.slug ?? categories?.[0]?.slug ?? null;
 
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/80">
@@ -44,6 +49,42 @@ export function CreateRoomModal({
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-xl border border-[#34343D] bg-[#232329] px-4 py-3 text-[15px] text-foreground outline-none focus:border-accent focus:ring-3 focus:ring-accent/25"
           />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="room-category"
+            className="text-xs font-bold tracking-[0.6px] text-[#9A9AA5] uppercase"
+          >
+            Category
+          </label>
+          {categoriesFailed ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#34343D] bg-[#232329] px-4 py-3">
+              <span className="text-sm text-red-400">Categories couldn’t be loaded.</span>
+              <button
+                type="button"
+                onClick={retryCategories}
+                className="shrink-0 text-sm font-extrabold text-accent hover:text-[#58E497]"
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <select
+              id="room-category"
+              value={category ?? ''}
+              onChange={(e) => setPickedCategory(e.target.value)}
+              disabled={!categories}
+              className="w-full rounded-xl border border-[#34343D] bg-[#232329] px-4 py-3 text-[15px] text-foreground outline-none focus:border-accent focus:ring-3 focus:ring-accent/25 disabled:opacity-60"
+            >
+              {!categories && <option value="">Loading…</option>}
+              {categories?.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -82,8 +123,8 @@ export function CreateRoomModal({
             Cancel
           </button>
           <button
-            onClick={() => onCreate(name, capacity)}
-            disabled={creating || name.trim().length === 0}
+            onClick={() => category && onCreate(name, category, capacity)}
+            disabled={creating || name.trim().length === 0 || category === null}
             className="flex-1 rounded-full bg-accent py-3.5 font-extrabold text-white disabled:opacity-60"
           >
             {creating ? 'Creating…' : 'Create Room'}

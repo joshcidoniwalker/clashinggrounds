@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 
 import room.repository as repo
 from config import Config
-from room.models import ChatMessage, Member, Room
+from room.category_client import fetch_active_categories
+from room.models import Category, ChatMessage, Member, Room
 
 
 class RoomNotFoundError(Exception):
@@ -31,6 +32,10 @@ class RateLimitedError(Exception):
     pass
 
 
+class UnknownCategoryError(Exception):
+    pass
+
+
 def _load_room(room_id: str) -> Room:
     fields = repo.get_room_fields(room_id)
     if fields is None:
@@ -53,6 +58,7 @@ def _load_room(room_id: str) -> Room:
     return Room(
         id=room_id,
         name=fields["name"],
+        category=Category(slug=fields["category_slug"], name=fields["category_name"]),
         capacity=int(fields["capacity"]),
         host_id=fields["host_id"],
         designated_successor_id=fields["designated_successor_id"] or None,
@@ -64,21 +70,42 @@ def get_room(room_id: str) -> Room:
     return _load_room(room_id)
 
 
-def browse_rooms() -> list[Room]:
-    return [_load_room(room_id) for room_id in repo.list_room_ids() if repo.room_exists(room_id)]
+def browse_rooms(category_slug: str | None = None) -> list[Room]:
+    rooms = [_load_room(room_id) for room_id in repo.list_room_ids() if repo.room_exists(room_id)]
+    if category_slug is None:
+        return rooms
+    return [room for room in rooms if room.category.slug == category_slug]
 
 
-def create_room(*, name: str, capacity: int, host_id: str, host_username: str) -> Room:
+def _resolve_category(slug: str) -> Category:
+    name = fetch_active_categories().get(slug)
+    if name is None:
+        raise UnknownCategoryError(slug)
+    return Category(slug=slug, name=name)
+
+
+def create_room(
+    *, name: str, category_slug: str, capacity: int, host_id: str, host_username: str
+) -> Room:
     if not (Config.ROOM_MIN_CAPACITY <= capacity <= Config.ROOM_MAX_CAPACITY):
         raise InvalidCapacityError(
             f"Capacity must be between {Config.ROOM_MIN_CAPACITY} and {Config.ROOM_MAX_CAPACITY}"
         )
+    # Validated before the rate limit so a rejected request doesn't use up one of
+    # the user's room creations for the minute.
+    category = _resolve_category(category_slug)
     if repo.increment_room_create_count(host_id) > Config.ROOM_CREATE_RATE_LIMIT_PER_MINUTE:
         raise RateLimitedError(host_id)
 
     room_id = uuid.uuid4().hex
     repo.create_room(
-        room_id, name=name, capacity=capacity, host_id=host_id, host_username=host_username
+        room_id,
+        name=name,
+        category_slug=category.slug,
+        category_name=category.name,
+        capacity=capacity,
+        host_id=host_id,
+        host_username=host_username,
     )
     return _load_room(room_id)
 

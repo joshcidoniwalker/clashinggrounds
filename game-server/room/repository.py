@@ -78,13 +78,22 @@ def is_member(room_id: str, user_id: str) -> bool:
 
 
 def create_room(
-    room_id: str, *, name: str, capacity: int, host_id: str, host_username: str
+    room_id: str,
+    *,
+    name: str,
+    category_slug: str,
+    category_name: str,
+    capacity: int,
+    host_id: str,
+    host_username: str,
 ) -> None:
     pipe = redis_client.pipeline()
     pipe.hset(
         _room_key(room_id),
         mapping={
             "name": name,
+            "category_slug": category_slug,
+            "category_name": category_name,
             "capacity": capacity,
             "host_id": host_id,
             "designated_successor_id": "",

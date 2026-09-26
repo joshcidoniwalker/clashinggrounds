@@ -5,6 +5,7 @@ import room.service as service
 from auth import require_auth
 from config import Config
 from room.broadcast import broadcast_room_state
+from room.category_client import CategoriesUnavailableError
 from room.schemas import (
     CreateRoomRequest,
     DesignateSuccessorRequest,
@@ -37,7 +38,7 @@ def ice_servers():
 # summary carries no member identities; joining still requires a token.
 @room_bp.get("")
 def browse():
-    rooms = service.browse_rooms()
+    rooms = service.browse_rooms(request.args.get("category"))
     return jsonify([RoomSummary.from_room(r).model_dump() for r in rooms])
 
 
@@ -52,12 +53,17 @@ def create():
     try:
         room = service.create_room(
             name=body.name,
+            category_slug=body.category,
             capacity=body.capacity,
             host_id=g.user["sub"],
             host_username=g.user["username"],
         )
     except service.InvalidCapacityError as exc:
         return jsonify(error=str(exc)), 400
+    except service.UnknownCategoryError:
+        return jsonify(error="Unknown category"), 400
+    except CategoriesUnavailableError:
+        return jsonify(error="Room creation is temporarily unavailable"), 503
     except service.RateLimitedError:
         return jsonify(error="You're creating rooms too quickly — try again in a minute"), 429
 

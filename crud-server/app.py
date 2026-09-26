@@ -4,6 +4,7 @@ from flask_cors import CORS
 from character.routes import character_bp
 from config import Config
 from identity.routes import identity_bp
+from room_category.routes import room_category_bp
 
 
 def create_app() -> Flask:
@@ -13,6 +14,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(identity_bp)
     app.register_blueprint(character_bp)
+    app.register_blueprint(room_category_bp)
 
     @app.get("/health")
     def health():

@@ -11,6 +11,12 @@ export type AuthResponse = {
   user: User;
 };
 
+export type RoomCategory = {
+  slug: string;
+  name: string;
+  is_default: boolean;
+};
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -40,4 +46,12 @@ export function signup(username: string, email: string, password: string) {
 
 export function login(email: string, password: string) {
   return postJson<AuthResponse>('/identity/login', { email, password });
+}
+
+export async function getRoomCategories(): Promise<RoomCategory[]> {
+  const response = await fetch(`${CRUD_API_URL}/room-categories`);
+  if (!response.ok) {
+    throw new ApiError(response.status, 'Request failed');
+  }
+  return response.json();
 }
