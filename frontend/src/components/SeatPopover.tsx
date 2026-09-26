@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/Avatar';
 import { HostTag } from '@/components/HostTag';
 import { NextHostButton } from '@/components/NextHostButton';
+import { RowAction } from '@/components/RowAction';
 import type { SeatView } from '@/components/Seat';
 import { VoiceStatus } from '@/components/VoiceStatus';
 import { SEAT_DIAMETER, type SeatPoint } from '@/lib/tableLayout';
@@ -14,14 +15,16 @@ export function SeatPopover({
   view,
   point,
   stage,
-  canDesignate,
+  canManage,
   onMakeHost,
+  onMoveToAudience,
 }: {
   view: SeatView;
   point: SeatPoint;
   stage: { width: number; height: number };
-  canDesignate: boolean;
+  canManage: boolean;
   onMakeHost: () => void;
+  onMoveToAudience: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -46,7 +49,7 @@ export function SeatPopover({
     setPosition((current) =>
       current?.left === left && current.top === top ? current : { left, top },
     );
-  }, [point, stage, view, canDesignate]);
+  }, [point, stage, view, canManage]);
 
   return (
     <div
@@ -78,7 +81,13 @@ export function SeatPopover({
       )}
 
       {isSelf && <p className="text-xs text-[#9A9AA5]">This is you.</p>}
-      {canDesignate && <NextHostButton isNextHost={isNextHost} onMakeHost={onMakeHost} />}
+      {canManage && !isSelf && (
+        <div className="flex flex-wrap gap-2">
+          <NextHostButton isNextHost={isNextHost} onMakeHost={onMakeHost} />
+          <RowAction label="Move to audience" onClick={onMoveToAudience} />
+        </div>
+      )}
+      {isSelf && <RowAction label="Leave table" onClick={onMoveToAudience} />}
     </div>
   );
 }

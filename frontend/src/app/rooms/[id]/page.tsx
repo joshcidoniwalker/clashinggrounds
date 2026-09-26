@@ -1,23 +1,26 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ParticipantsPanel } from '@/components/ParticipantsPanel';
 import { RemoteAudio } from '@/components/RemoteAudio';
 import { RoomHeader } from '@/components/RoomHeader';
 import { RoomTable } from '@/components/RoomTable';
-import type { SeatView } from '@/components/Seat';
+import { isSeated, type SeatView } from '@/components/Seat';
+import { Toast } from '@/components/Toast';
 import { useAuthUser } from '@/hooks/useAuthUser';
 import { useSpeaking } from '@/hooks/useSpeaking';
 import { useVoiceChat } from '@/hooks/useVoiceChat';
 import {
   GAME_API_URL,
+  addSpeaker,
   designateSuccessor,
   getIceServers,
   getRoom,
   leaveRoom,
+  moveToAudience,
   type ChatMessage,
   type RoomDetail,
 } from '@/lib/gameApi';
@@ -33,6 +36,30 @@ function closingParticipants(current: SidePanel): SidePanel {
   return current === 'participants' ? null : current;
 }
 
+type SelfState = { seated: boolean; isHost: boolean };
+
+function selfStateIn(room: RoomDetail, userId: string): SelfState | null {
+  const self = room.members.find((member) => member.user_id === userId);
+  if (!self) return null;
+  return { seated: self.seat !== null, isHost: room.host_id === userId };
+}
+
+function toastFor(previous: SelfState, next: SelfState, movedSelf: boolean): string | null {
+  if (previous.seated !== next.seated) {
+    if (movedSelf) return null;
+    return next.seated ? "You've been added to the table" : 'The host moved you to the audience';
+  }
+  if (!previous.isHost && next.isHost && !next.seated) return "You're now the host";
+  return null;
+}
+
+// Audience members have no seat of their own to put at bottom centre, so the
+// table is oriented around the host's seat instead, or left unrotated.
+function viewerSeatIn(room: RoomDetail, userId: string): number {
+  const seatOf = (id: string) => room.members.find((member) => member.user_id === id)?.seat;
+  return seatOf(userId) ?? seatOf(room.host_id) ?? 0;
+}
+
 export default function RoomViewPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -44,7 +71,30 @@ export default function RoomViewPage() {
   const [iceServers, setIceServers] = useState<RTCIceServer[] | null>(null);
   const [sidePanel, setSidePanel] = useState<SidePanel>('chat');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const selfStateRef = useRef<SelfState | null>(null);
+  // Set while this client's own Leave table / Take a seat is in flight, so the
+  // resulting role change isn't announced as something the host did.
+  const movingSelfRef = useRef(false);
+
+  const applyRoom = useCallback(
+    (next: RoomDetail) => {
+      setRoom(next);
+      if (!user) return;
+
+      const nextSelf = selfStateIn(next, user.userId);
+      const previous = selfStateRef.current;
+      selfStateRef.current = nextSelf;
+      if (!previous || !nextSelf) return;
+
+      const message = toastFor(previous, nextSelf, movingSelfRef.current);
+      if (previous.seated !== nextSelf.seated) movingSelfRef.current = false;
+      if (message) setToast(message);
+    },
+    [user],
+  );
+  const dismissToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
     if (!user) return;
@@ -54,7 +104,7 @@ export default function RoomViewPage() {
   useEffect(() => {
     if (!user) return;
 
-    getRoom(user.token, params.id).then(setRoom);
+    getRoom(user.token, params.id).then(applyRoom);
 
     const socket: Socket = io(GAME_API_URL);
     socketRef.current = socket;
@@ -68,7 +118,7 @@ export default function RoomViewPage() {
       setSocket(socket);
     });
     socket.on('disconnect', () => setSocket(null));
-    socket.on('room_updated', (data: RoomDetail) => setRoom(data));
+    socket.on('room_updated', applyRoom);
     socket.on('room_closed', () => router.push('/rooms'));
     socket.on('chat_history', (history: ChatMessage[]) => setMessages(history));
     socket.on('chat_message', (message: ChatMessage) => {
@@ -81,23 +131,24 @@ export default function RoomViewPage() {
       socketRef.current = null;
       setSocket(null);
     };
-  }, [user, params.id, router]);
+  }, [user, params.id, router, applyRoom]);
 
-  const { micEnabled, toggleMic, micError, peerStates, remoteStreams, localStream } = useVoiceChat({
-    socket,
-    roomId: params.id,
-    token: user?.token ?? '',
-    userId: user?.userId ?? '',
-    members: room?.members ?? NO_MEMBERS,
-    iceServers,
-  });
+  const { isSpeaker, micEnabled, toggleMic, micError, peerStates, remoteStreams, localStream } =
+    useVoiceChat({
+      socket,
+      roomId: params.id,
+      token: user?.token ?? '',
+      userId: user?.userId ?? '',
+      members: room?.members ?? NO_MEMBERS,
+      iceServers,
+    });
 
   const selfMuted = !micEnabled || micError !== null;
 
   useEffect(() => {
-    if (!socket || !user) return;
+    if (!socket || !user || !isSpeaker) return;
     socket.emit('set_muted', { token: user.token, room_id: params.id, muted: selfMuted });
-  }, [socket, user, params.id, selfMuted]);
+  }, [socket, user, params.id, isSpeaker, selfMuted]);
 
   const audioStreams = useMemo(
     () => (user && localStream ? { ...remoteStreams, [user.userId]: localStream } : remoteStreams),
@@ -133,8 +184,20 @@ export default function RoomViewPage() {
 
   async function handleMakeHost(targetUserId: string) {
     if (!user) return;
-    const updated = await designateSuccessor(user.token, params.id, targetUserId);
-    setRoom(updated);
+    applyRoom(await designateSuccessor(user.token, params.id, targetUserId));
+  }
+
+  async function handleAddToTable(targetUserId: string) {
+    if (!user) return;
+    movingSelfRef.current = targetUserId === user.userId;
+    applyRoom(await addSpeaker(user.token, params.id, targetUserId));
+  }
+
+  async function handleMoveToAudience(targetUserId: string) {
+    if (!user) return;
+    setSelectedId(null);
+    movingSelfRef.current = targetUserId === user.userId;
+    applyRoom(await moveToAudience(user.token, params.id, targetUserId));
   }
 
   function handleSend(body: string) {
@@ -161,36 +224,42 @@ export default function RoomViewPage() {
       voice: seatVoiceFor({
         isSelf,
         selfMuted,
+        micUnavailable: micError !== null,
         muted: member.muted,
         peerState: peerStates[member.user_id],
       }),
       speaking: speaking.has(member.user_id),
     };
   });
-  const viewerSeat = room.members.find((member) => member.user_id === user.userId)?.seat ?? 0;
+  const speakers = seats.filter(isSeated);
+  const audience = seats.filter((view) => !isSeated(view));
   const isHost = room.host_id === user.userId;
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
       <RoomTable
         capacity={room.capacity}
-        viewerSeat={viewerSeat}
-        seats={seats}
+        viewerSeat={viewerSeatIn(room, user.userId)}
+        seats={speakers}
         selectedId={selectedId}
-        canDesignate={isHost}
+        canManage={isHost}
         onSelect={(userId) => setSelectedId((current) => (current === userId ? null : userId))}
         onDismiss={dismissOverlays}
         onMakeHost={handleMakeHost}
+        onMoveToAudience={handleMoveToAudience}
       />
 
       <RoomHeader
         name={room.name}
-        memberCount={room.members.length}
-        capacity={room.capacity}
+        isSpeaker={isSpeaker}
+        isHost={isHost}
+        tableFull={speakers.length >= room.capacity}
         micEnabled={micEnabled}
         chatOpen={sidePanel === 'chat'}
         participantsOpen={sidePanel === 'participants'}
         onLeave={handleLeave}
+        onLeaveTable={() => handleMoveToAudience(user.userId)}
+        onTakeSeat={() => handleAddToTable(user.userId)}
         onToggleMic={toggleMic}
         onToggleChat={() => togglePanel('chat')}
         onToggleParticipants={() => togglePanel('participants')}
@@ -208,10 +277,13 @@ export default function RoomViewPage() {
         )}
         {sidePanel === 'participants' && (
           <ParticipantsPanel
-            seats={seats}
+            speakers={speakers}
+            audience={audience}
             capacity={room.capacity}
-            canDesignate={isHost}
+            canManage={isHost}
             onMakeHost={handleMakeHost}
+            onAddToTable={handleAddToTable}
+            onMoveToAudience={handleMoveToAudience}
             onClose={() => setSidePanel(null)}
           />
         )}
@@ -222,6 +294,8 @@ export default function RoomViewPage() {
           {micError}
         </p>
       )}
+
+      {toast && <Toast message={toast} onDone={dismissToast} />}
 
       {Object.entries(remoteStreams).map(([peerId, stream]) => (
         <RemoteAudio key={peerId} stream={stream} />

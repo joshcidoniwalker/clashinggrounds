@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef } from 'react';
-import { EmptyChair, Seat, type SeatView } from '@/components/Seat';
+import { EmptyChair, Seat, type SeatedView } from '@/components/Seat';
 import { SeatPopover } from '@/components/SeatPopover';
 import { useElementSize } from '@/hooks/useElementSize';
 import { positionOfSeat, tableLayout } from '@/lib/tableLayout';
@@ -24,19 +24,21 @@ export function RoomTable({
   viewerSeat,
   seats,
   selectedId,
-  canDesignate,
+  canManage,
   onSelect,
   onDismiss,
   onMakeHost,
+  onMoveToAudience,
 }: {
   capacity: number;
   viewerSeat: number;
-  seats: SeatView[];
+  seats: SeatedView[];
   selectedId: string | null;
-  canDesignate: boolean;
+  canManage: boolean;
   onSelect: (userId: string) => void;
   onDismiss: () => void;
   onMakeHost: (userId: string) => void;
+  onMoveToAudience: (userId: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const size = useElementSize(ref);
@@ -81,8 +83,9 @@ export function RoomTable({
               view={selected}
               point={layout.seats[positionOfSeat(selected.member.seat, viewerSeat, capacity)]}
               stage={size}
-              canDesignate={canDesignate && !selected.isSelf}
+              canManage={canManage}
               onMakeHost={() => onMakeHost(selected.member.user_id)}
+              onMoveToAudience={() => onMoveToAudience(selected.member.user_id)}
             />
           )}
         </>

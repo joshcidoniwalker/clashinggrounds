@@ -5,7 +5,8 @@ const GAME_API_URL = process.env.NEXT_PUBLIC_GAME_API_URL ?? 'http://localhost:5
 export type Member = {
   user_id: string;
   username: string;
-  seat: number;
+  // null for audience members; only speakers have a seat at the table.
+  seat: number | null;
   muted: boolean;
 };
 
@@ -19,8 +20,13 @@ export type RoomSummary = {
   name: string;
   category: Category;
   capacity: number;
-  member_count: number;
+  speaker_count: number;
+  audience_count: number;
 };
+
+export function roomCountsLabel(room: RoomSummary): string {
+  return `${room.speaker_count}/${room.capacity} speakers · ${room.audience_count} listening`;
+}
 
 export type ChatMessage = {
   room_id: string;
@@ -93,6 +99,17 @@ export function designateSuccessor(token: string, roomId: string, userId: string
     method: 'POST',
     body: JSON.stringify({ user_id: userId }),
   });
+}
+
+export function addSpeaker(token: string, roomId: string, userId: string) {
+  return request<RoomDetail>(`/rooms/${roomId}/speakers`, token, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  });
+}
+
+export function moveToAudience(token: string, roomId: string, userId: string) {
+  return request<RoomDetail>(`/rooms/${roomId}/speakers/${userId}`, token, { method: 'DELETE' });
 }
 
 export { GAME_API_URL };

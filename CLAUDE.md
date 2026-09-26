@@ -48,8 +48,8 @@ The one runtime call from `game-server` to `crud-server` is room creation: `POST
 - `room:{id}` — hash: `name`, `category_slug`, `category_name`, `capacity`, `host_id`, `designated_successor_id`, `created_at`. The category name is captured at creation, so a later rename or retirement doesn't affect live rooms
 - `room:{id}:member_order` — sorted set, `user_id → join timestamp` (oldest = longest-tenured; used as the host-handoff fallback)
 - `room:{id}:member_names` — hash, `user_id → username`
-- `room:{id}:seats` — hash, `user_id → seat index`; a joiner gets the lowest free index and keeps it until they leave, so seating never shuffles
-- `room:{id}:muted` — set of muted `user_id`s, written by the `set_muted` socket event
+- `room:{id}:seats` — hash, `user_id → seat index`, **speakers only**: having a seat is what makes someone a speaker rather than audience (spec: `docs/AUDIENCE.md`). Joiners start unseated; being added to the table claims the lowest free index atomically (Lua script `_CLAIM_SEAT`), kept until they leave the table, so seating never shuffles
+- `room:{id}:muted` — set of muted `user_id`s, written by the `set_muted` socket event (speakers only; cleared when someone leaves the table)
 - `room:{id}:chat` — list of JSON messages, oldest first; `RPUSH` + `LTRIM` caps it at `Config.CHAT_BUFFER_SIZE` (50)
 - `rooms:index` — set of all active room ids (browse)
 - `rate:chat:{user_id}` — counter with a 60s TTL set on the window's first message (fixed window, not sliding); caps chat at `Config.CHAT_RATE_LIMIT_PER_MINUTE` (20)
@@ -71,7 +71,9 @@ Each client event carries its own `token` rather than relying on the sid mapping
 
 P2P mesh. The server only relays: `webrtc_signal` is addressed to one peer via `_presence_sids` (the reverse of `_sid_presence`, in `room/sockets.py`), checks both ends are room members, and forwards `signal` without inspecting it. `GET /rtc/ice-servers` (`rtc_bp`, authenticated) hands clients the STUN/TURN config from `Config.STUN_URL` / `TURN_URL` / `TURN_USERNAME` / `TURN_CREDENTIAL`.
 
-`frontend/src/hooks/useVoiceChat.ts` drives the mesh off the member list in `room_updated` — no separate peer-join events. Both ends of a pair build a connection from the same list, so **the peer with the lexicographically lower `user_id` sends the offer**; without that rule both would offer at once and the negotiations collide. Members that disappear from the list get their connection closed, which is also how leaving tears a peer down.
+`frontend/src/hooks/useVoiceChat.ts` drives the mesh off the member list in `room_updated` — no separate peer-join events. Each pair's **link** comes from both ends' roles: `duplex` between two speakers, `from:<speaker id>` (one-way) between a speaker and an audience member, none between two audience members. Both ends derive the same link, so exactly one offers: **the speaker on a one-way link, the lexicographically lower `user_id` on a duplex one**; without that rule both would offer at once and the negotiations collide. A pair whose link changes (someone joins or leaves the table) gets its connection closed and rebuilt, and members that disappear from the list get theirs closed, which is also how leaving tears a peer down.
+
+Every signal carries its `link`. An incoming offer always replaces any existing connection with that peer (the other end may have rebuilt before this client rendered the role change); answers and candidates for a different link are dropped. Signals are handled strictly in order through a promise queue, because answering a duplex offer may first await the mic. The mic is only acquired while seated and is released on leaving the table.
 
 Signals are `{description}` or `{candidate}` — remote ICE candidates arriving before `setRemoteDescription` are queued in `pendingCandidates` and flushed after, since `addIceCandidate` throws without a remote description.
 
@@ -85,7 +87,7 @@ JWT lives in `localStorage` (`frontend/src/lib/auth.ts`). `frontend/src/hooks/us
 
 ### Room view = live socket connection
 
-The room page is a full-screen table (`components/RoomTable.tsx`, geometry in `lib/tableLayout.ts`) with no site top bar. Each client rotates the table so its own seat is drawn at bottom centre — `positionOfSeat` maps the server's seat index to a screen position; seat order is otherwise shared by all viewers. Every avatar goes through `components/Avatar.tsx`, the placeholder Phase 6 replaces with real characters. The speaking ring comes from `hooks/useSpeaking.ts`, which meters each audio stream (remote peers and the local mic) with a Web Audio analyser — nothing about speaking goes over the network.
+The room page is a full-screen table (`components/RoomTable.tsx`, geometry in `lib/tableLayout.ts`) with no site top bar. Only speakers are drawn. Each client rotates the table so its own seat is drawn at bottom centre (an audience member uses the host's seat, or seat 0 if the host isn't seated) — `positionOfSeat` maps the server's seat index to a screen position; seat order is otherwise shared by all viewers. Every avatar goes through `components/Avatar.tsx`, the placeholder Phase 6 replaces with real characters. The speaking ring comes from `hooks/useSpeaking.ts`, which meters each audio stream (remote peers and the local mic) with a Web Audio analyser — nothing about speaking goes over the network.
 
 `frontend/src/app/rooms/[id]/page.tsx` opens its Socket.IO connection on mount and closes it on unmount. Navigating away from a room by any means (not just the "Leave Room" button) triggers the same disconnect-based leave/host-handoff path on the backend.
 

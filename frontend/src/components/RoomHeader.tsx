@@ -8,23 +8,29 @@ const ACTIVE = 'border-accent bg-[#0F0F12]/75 text-accent';
 
 export function RoomHeader({
   name,
-  memberCount,
-  capacity,
+  isSpeaker,
+  isHost,
+  tableFull,
   micEnabled,
   chatOpen,
   participantsOpen,
   onLeave,
+  onLeaveTable,
+  onTakeSeat,
   onToggleMic,
   onToggleChat,
   onToggleParticipants,
 }: {
   name: string;
-  memberCount: number;
-  capacity: number;
+  isSpeaker: boolean;
+  isHost: boolean;
+  tableFull: boolean;
   micEnabled: boolean;
   chatOpen: boolean;
   participantsOpen: boolean;
   onLeave: () => void;
+  onLeaveTable: () => void;
+  onTakeSeat: () => void;
   onToggleMic: () => void;
   onToggleChat: () => void;
   onToggleParticipants: () => void;
@@ -48,21 +54,39 @@ export function RoomHeader({
             event.stopPropagation();
             onToggleParticipants();
           }}
-          aria-label={`Participants, ${memberCount} of ${capacity} seats taken`}
+          aria-label="Participants"
           aria-expanded={participantsOpen}
-          className={`${BUTTON} flex items-center gap-1.75 tabular-nums ${participantsOpen ? ACTIVE : QUIET}`}
+          className={`${BUTTON} flex items-center gap-1.75 ${participantsOpen ? ACTIVE : QUIET}`}
         >
           <PeopleIcon size={16} color="currentColor" />
-          {memberCount}/{capacity}
+          <span className="max-sm:hidden">Participants</span>
         </button>
-        <button
-          type="button"
-          onClick={onToggleMic}
-          aria-pressed={!micEnabled}
-          className={`${BUTTON} ${micEnabled ? QUIET : 'border-[#FF3B30] bg-[#FF3B30] text-white'}`}
-        >
-          {micEnabled ? 'Mute' : 'Unmute'}
-        </button>
+        {isSpeaker && (
+          <button type="button" onClick={onLeaveTable} className={`${BUTTON} ${QUIET}`}>
+            Leave table
+          </button>
+        )}
+        {isHost && !isSpeaker && (
+          <button
+            type="button"
+            onClick={onTakeSeat}
+            disabled={tableFull}
+            title={tableFull ? 'No free seats' : undefined}
+            className={`${BUTTON} ${QUIET} disabled:cursor-default disabled:opacity-40`}
+          >
+            Take a seat
+          </button>
+        )}
+        {isSpeaker && (
+          <button
+            type="button"
+            onClick={onToggleMic}
+            aria-pressed={!micEnabled}
+            className={`${BUTTON} ${micEnabled ? QUIET : 'border-[#FF3B30] bg-[#FF3B30] text-white'}`}
+          >
+            {micEnabled ? 'Mute' : 'Unmute'}
+          </button>
+        )}
         <button
           type="button"
           onClick={onToggleChat}
